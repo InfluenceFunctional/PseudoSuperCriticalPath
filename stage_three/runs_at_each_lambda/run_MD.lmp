@@ -1,0 +1,66 @@
+  variable          T_sample      equal _T_SAMPLE    # Temperature
+  variable          t_run  equal _N_STEPS     # number of MD steps
+  variable          t_print equal ${t_run}/200  #how often to print histogram
+
+  variable eta_lj equal 0.1
+  variable eta_c equal 0.1
+  variable lambda equal _LAMBDA
+
+  variable scale_lj equal ${eta_lj}+v_lambda*(1.0-${eta})
+  variable scale_coulomb equal (${eta_c}+v_lambda*(1.0-${eta}))^2
+
+  read_restart _RESTART_FILE
+
+  # Switch to hybrid/scaled style from original hybrid style.
+  # This allows to adapt the LJ and Coulombic interactions differently.
+  # Parameters taken from new_system.in.init
+  pair_style hybrid/scaled v_scale_lj lj/charmm 9.0 10.0 10.0 v_scale_coulomb coul/long/charmm 9.0 10.0 10.0 v_scale_gauss gauss 10.0
+
+  # load force field parameters
+  include "system.in.settings.hybrid_overlay"
+
+  # load force field parameters
+  include "coeffs.txt"
+
+  velocity        mobile zero linear units box
+
+  kspace_style    pppm 0.0001
+  comm_style tiled
+  balance 1.1 rcb
+
+  reset_timestep    0
+
+#--------------------------- Thermo stylepa and settings -------------------------#
+  timestep          1.0
+  compute mobileTemp mobile temp
+  compute staticTemp stat temp
+  compute coul all pair coul/long/charmm
+  compute lj all pair lj/charmm
+  compute gauss all pair gauss
+
+  thermo_style      custom step time vol temp press ke pe etotal epair evdwl etail ecoul elong emol vol density cella cellb cellc cellalpha cellbeta cellgamma c_mobileTemp c_staticTemp v_scale_lj v_scale_coulomb v_scale_gauss v_lambda c_lj c_coul c_gauss
+  thermo            200
+
+
+#--------------------------- Computes ------------------------------------------#
+
+  compute       cc1 all chunk/atom molecule
+  compute myChunk all temp/chunk cc1 temp kecom internal
+
+  fix 1 all ave/time ${t_print} 1 ${t_print} c_myChunk[*] file tmp.out mode vector
+
+  dump              d2 all custom ${t_print} traj.dump id mol type xu yu zu
+
+#---------------------- Thermostat & Barostat ----------------------------------#
+
+fix              f2 mobile nvt temp ${T_sample} ${T_sample} $(100.0*dt)
+compute      tempcom mobile temp/com
+fix_modify   f2 temp tempcom
+
+fix f3 mobile adapt 1 kspace v_scale_coulomb scale yes
+
+  run               ${t_run}
+
+  write_data        cluster_stage_three_lambda.data
+
+  write_restart   cluster_stage_three_lambda.restart

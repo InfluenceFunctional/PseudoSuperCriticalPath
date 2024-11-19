@@ -1,0 +1,132 @@
+#-------------------------------------------------------------------------------#
+#
+#  This is the lammps input file
+#
+#-------------------------------------------------------------------------------#
+
+
+#--------------------------- General Variables ---------------------------------#
+  variable          nx     equal 1      # System size.
+  variable          ny     equal 1      # System size.
+  variable          nz     equal 1      # System size.
+  variable          T_sample      equal _TEMP_SAMPLE    # Temperature
+  variable          T_init      equal _INIT_TEMP    # Initial Temperature
+  variable          rnd    equal _SEED     # seed for random velocities
+  variable          t_run  equal _RUNTIME     # number of MD steps
+  variable          t_print equal ${t_run}/_PRINTSTEPS  #how often to print histogram
+
+  variable          t_equil equal _EQUIL_TIME   # how long to equilibrate different melts
+#_MELT_PREP  variable          T_melt  equal _MELT_TEMP    # temperature at which to melt things
+#_MELT_PREP  variable          melt_start_ind  equal _MELT_START_IND
+#_MELT_PREP  variable          melt_end_ind    equal _MELT_END_IND
+#_MELT_PREP  variable          crystal_start_ind  equal _CRYSTAL_START_IND
+#_MELT_PREP  variable          crystal_end_ind    equal _CRYSTAL_END_IND
+
+#-------------------------------------------------------------------------------#
+  boundary			_BOUND _BOUND _BOUND
+
+#------------------------- Load initial setup ----------------------------------#
+  # load function definition
+  include "new_system.in.init"
+
+  # read system setup (positions, connectivity,...)
+  read_data "new_system.data"
+
+  # load force field parameters
+  include "system.in.settings"
+
+  #_NPT_TRI change_box all triclinic
+
+  #_KSPACE kspace_style    pppm 0.0001
+  comm_style tiled
+  balance 1.1 rcb
+
+#-------------------------------------------------------------------------------#
+#-------------------------------------------------------------------------------#
+  minimize          1.0e-4 1.0e-6 100 1000
+  write_data        cluster_${nx}x${ny}x${nz}_minimize.data
+  reset_timestep    0
+
+#------------------ Computes, variables & modifications ------------------------#
+  variable          step    equal step
+  variable          time    equal time
+  variable          temp    equal temp
+  variable          press   equal press
+  variable          etot    equal etotal
+
+#--------------------------- Thermo stylepa and settings -------------------------#
+  timestep          1.0
+  thermo_style      custom step time vol temp press ke pe etotal epair emol vol density cella cellb cellc cellalpha cellbeta cellgamma
+  thermo            200
+
+
+#--------------------------- Computes ------------------------------------------#
+
+  compute       cc1 all chunk/atom molecule
+  compute myChunk all temp/chunk cc1 temp kecom internal
+
+  fix 1 all ave/time ${t_print} 1 ${t_print} c_myChunk[*] file tmp.out mode vector
+  fix 2 all momentum 100 linear 1 1 1 angular rescale
+
+# dump              d1 all dcd ${t_print} traj.dcd
+  dump              d2 all custom ${t_print} traj.dump id mol element xu yu zu
+
+#_DUMP_MODIFY
+
+#--------------------------- Crystal/Melt Preparation------------------------#
+#_MELT_PREP group crystal molecule ${crystal_start_ind}:${crystal_end_ind}
+#_MELT_PREP group melt molecule ${melt_start_ind}:${melt_end_ind}
+
+#_MELT_PREP fix f11 all npt temp ${T_init} ${T_sample} $(100.0*dt) iso 0.0 0.0 $(1000.0*dt)
+#_MELT_PREP velocity          all create ${T_sample} ${rnd} mom yes rot yes dist gaussian
+#_MELT_PREP run ${t_equil}  # equilibrate
+#_MELT_PREP unfix f11
+
+#_MELT_PREP fix f12 melt nvt temp ${T_sample} ${T_melt} $(100.0*dt)
+#_MELT_PREP run ${t_equil}  # melt
+#_MELT_PREP unfix f12
+
+#_MELT_PREP fix f131 melt nvt temp ${T_melt} 800 $(100.0*dt)
+#_MELT_PREP run ${t_equil}  # cool
+#_MELT_PREP unfix f131
+
+#_CRYSTAL_PREP fix f132 melt npt temp 800 ${T_sample} $(100.0*dt) iso ${press} 1.0 $(1000.0*dt)
+#_INTERFACE_PREP fix f132 melt npt temp 800 ${T_sample} $(100.0*dt) z ${press} 1.0 $(1000.0*dt)
+#_MELT_PREP run ${t_equil}  # NPT cool
+#_MELT_PREP unfix f132
+
+#_CRYSTAL_PREP fix f133 all npt temp ${T_sample} ${T_sample} $(100.0*dt) iso ${press} 1.0 $(1000.0*dt)
+#_INTERFACE_PREP fix f133 all npt temp ${T_sample} ${T_sample} $(100.0*dt) z ${press} 1.0 $(1000.0*dt)
+#_MELT_PREP fix s1 crystal spring/self 10 xyz  # add restraining force atomwise on crystals
+#_MELT_PREP run ${t_equil}  # re equilibrate
+#_MELT_PREP unfix f133
+#_MELT_PREP unfix s1
+
+#--------------------------- Pre-Ramp Thermalization ------------------------#
+#_EQUIL_BEFORE_RAMP #_NPT_ISO fix f11 all npt temp 1 ${T_init} $(100.0*dt) iso 1.0 1.0 $(1000.0*dt)
+#_EQUIL_BEFORE_RAMP #_NPT_ANISO fix f11 all npt temp 1 ${T_init} $(100.0*dt) aniso 1.0 1.0 $(1000.0*dt)
+#_EQUIL_BEFORE_RAMP #_NPT_TRI fix f11 all npt temp 1 ${T_init} $(100.0*dt) tri 1.0 1.0 $(1000.0*dt)
+#_EQUIL_BEFORE_RAMP #_FIX_COM fix recenter1 all recenter INIT INIT INIT units box
+#_EQUIL_BEFORE_RAMP velocity          all create 1 ${rnd} mom yes rot yes dist gaussian
+#_EQUIL_BEFORE_RAMP run ${t_equil}  # equilibrate
+#_EQUIL_BEFORE_RAMP unfix f11
+#_EQUIL_BEFORE_RAMP #_FIX_COM unfix recenter 1
+#_EQUIL_BEFORE_RAMP write_data        cluster_${nx}x${ny}x${nz}_pre_equi.data
+
+#---------------------- Thermostat & Barostat ----------------------------------#
+#_NPT_ISO  fix               f2 all npt temp ${T_init} ${T_sample} $(100.0*dt) iso 1.0 1.0 $(1000.0*dt)
+#_NPT_ANISO  fix             f2 all npt temp ${T_init} ${T_sample} $(100.0*dt) aniso 1.0 1.0 $(1000.0*dt)
+#_NPT_TRI fix                f2 all npt temp ${T_init} ${T_sample} $(100.0*dt) tri 1.0 1.0 $(1000.0*dt)
+#_NPzT  fix               f2 all npt temp ${T_init} ${T_sample} $(100.0*dt) z 1.0 1.0 $(1000.0*dt)
+#_NOSE  fix               f2 all nvt temp ${T_init} ${T_sample} $(100.0*dt)
+#_LANGEVIN  fix				f2 all langevin ${T_init} ${T_sample} _DAMP ${rnd}
+#-------------------------------------------------------------------------------#
+
+#--------------------------- Fix center of mass---------------------------------#
+#_FIX_COM  fix recenter all recenter INIT INIT INIT units box
+
+  velocity          all create ${T_init} ${rnd} mom yes rot yes dist gaussian
+  run               ${t_run}
+  write_data        cluster_${nx}x${ny}x${nz}_equi.data
+
+  write_restart   cluster_${nx}x${ny}x${nz}_equi.restart

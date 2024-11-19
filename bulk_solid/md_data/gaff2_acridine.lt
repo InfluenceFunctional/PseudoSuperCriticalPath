@@ -1,0 +1,157 @@
+#    This is the 1.7 version of GAFF (from AmberTools15), downloaded 2015-8-17.
+####################################################################
+# To use this, LAMMPS currently must be compiled with the USER-MISC package.
+# (Type "make yes-user-misc" into the shell before compiling LAMMPS.)
+####################################################################
+#    This moltemplate (LT) file was generated automatically using
+# amberparm2lt.sh gaff.dat GAFF > gaff.lt
+####################################################################
+#    Background information and usage explanation:
+# This file contanis a list of atom types and rules for generating bonded
+# interactions between these atoms (hopefully) according to AMBER conventions.
+# By using the atom types shown below in your own molecules, bonds and angular
+# interactions will be automatically generated.
+# AMBER (GAFF) force-field parameters will also be assigned to each angle
+# interaction (according to these atom types).
+# One way to apply the GAFF force field to a particular type of molecule, is
+# to use the "inherits" keyword when you define that molecule.  For example:
+# import("gaff.lt")
+# MoleculeType inherits GAFF {
+#   write_once("Data Atoms") {
+#     $atom:C1 $mol:... @atom:cx 0.0 4.183 3.194 13.285
+#     $atom:C2 $mol:... @atom:cx 0.0 4.291 4.618 13.382
+#        :       :         :
+#   }
+# }
+#(See "Inheritance" and "short names vs. full names" in the moltemplate manual.)
+####################################################################
+#    Moltemplate can not assign atom charge.  You must assign atomic
+# charges yourself.  (Moltemplate is only a simple text manipulation tool.)
+# You can do this afterwards using commands like "set atom 70 charge -0.212"
+# For details, see http://lammps.sandia.gov/doc/set.html)
+####################################################################
+#
+# --- Description of atom types ---
+#  @atom:nb
+#  @atom:ca  Sp2 C in pure aromatic systems
+#  @atom:ha  H bonded to aromatic carbon
+
+
+
+
+
+GAFF2 {
+
+  # ----------------------------------------------------------------------
+  # The basic atom nomenclature and conventions are explained here:
+  #   http://ambermd.org/antechamber/gaff.pdf
+  # For reference, the original gaff.dat file and format documentation are here:
+  #   http://ambermd.org/AmberTools-get.html
+  #   http://ambermd.org/formats.html#parm.dat
+  # ----------------------------------------------------------------------
+
+  write_once("Data Masses") {
+    @atom:nb 14.01
+    @atom:ca 12.01
+    @atom:ha 1.008
+  } # (end of masses)
+
+  write_once("In Settings") {
+    pair_coeff @atom:nb @atom:nb lj/charmm/coul/long 0.1700 3.24999852378   # OPLS
+    pair_coeff @atom:ca @atom:ca lj/charmm/coul/long 0.0860 3.39966950842   # OPLS
+    pair_coeff @atom:ha @atom:ha lj/charmm/coul/long 0.0150 2.59964245953   # Spellmeyer
+  } # (end of pair_coeffs)
+
+  write_once("In Settings") {
+    bond_coeff @bond:ca-nb harmonic 488.0 1.339  # SOURCE3 1496 0.0045
+    bond_coeff @bond:ca-ca harmonic 461.1 1.398   # SOURCE1 6228 0.0147
+    bond_coeff @bond:ca-ha harmonic 345.8 1.086   # SOURCE3 1496 0.0045
+  } # (end of bond_coeffs)
+
+  write_once("Data Bonds By Type") {
+    @bond:ca-nb @atom:ca @atom:nb
+    @bond:ca-ca @atom:ca @atom:ca
+    @bond:ca-ha @atom:ca @atom:ha
+  } # (end of Bonds By Type)
+
+  write_once("In Settings") {
+    angle_coeff @angle:ca-ca-nb harmonic 68.8 122.94   # SOURCE3 2980 0.2511
+    angle_coeff @angle:ca-ca-ha harmonic 48.20 119.88   # SOURCE3 2980 0.2511
+    angle_coeff @angle:ca-ca-ca harmonic 66.60 120.02   # SOURCE3 1969 0.3480
+    angle_coeff @angle:ca-nb-ca harmonic 68.3 117.22   # SOURCE3 2980 0.2511
+  } # (end of angle_coeffs)
+
+  write_once("Data Angles By Type") {
+    @angle:ca-ca-nb @atom:ca @atom:ca @atom:nb
+    @angle:ca-ca-ha @atom:ca @atom:ca @atom:ha
+    @angle:ca-ca-ca @atom:ca @atom:ca @atom:ca
+    @angle:ca-nb-ca @atom:ca @atom:nb @atom:ca
+  } # (end of Angles By Type)
+
+  write_once("In Settings") {
+    dihedral_coeff @dihedral:ha-ca-ca-nb fourier 1 3.625 2 180.0    # intrpol.bsd.on C6H6
+    dihedral_coeff @dihedral:ca-ca-ca-nb fourier 1 3.625 2 180.0    # intrpol.bsd.on C6H6
+    dihedral_coeff @dihedral:ca-ca-ca-ha fourier 1 3.625 2 180.0    # intrpol.bsd.on C6H6
+    dihedral_coeff @dihedral:ca-ca-ca-ca fourier 1 3.625 2 180.0    # intrpol.bsd.on C6H6
+    dihedral_coeff @dihedral:ha-ca-ca-ha fourier 1 3.625 2 180.0    # AA,NMA (no c-n3, c-n4, c-nh)
+    dihedral_coeff @dihedral:ca-ca-nb-ca fourier 1 4.8 2 180.0    # intrpol.bsd.on C6H6
+  } # (end of dihedral_coeffs)
+
+  write_once("Data Dihedrals By Type") {
+    @dihedral:ha-ca-ca-nb @atom:ha @atom:ca @atom:ca @atom:nb
+    @dihedral:ca-ca-ca-nb @atom:ca @atom:ca @atom:ca @atom:nb
+    @dihedral:ca-ca-ca-ha @atom:ca @atom:ca @atom:ca @atom:ha 
+    @dihedral:ca-ca-ca-ca @atom:ca @atom:ca @atom:ca @atom:ca
+    @dihedral:ha-ca-ca-ha @atom:ha @atom:ca @atom:ca @atom:ha
+    @dihedral:ca-ca-nb-ca @atom:ca @atom:ca @atom:nb @atom:ca
+  } # (end of Dihedrals By Type)
+
+  write_once("In Settings") {
+    improper_coeff @improper:ca-ca-ca-ca harmonic 1.1 180   # bsd.on C6H6 nmodes
+    improper_coeff @improper:ca-ca-ca-ha harmonic 1.1 180   # bsd.on C6H6 nmodes
+    improper_coeff @improper:ca-ca-ca-nb harmonic 1.1 180   # bsd.on C6H6 nmodes
+  } # (end of improper_coeffs)
+
+  write_once("Data Impropers By Type (gaff_imp.py)") {
+    @improper:ca-ca-ca-ca @atom:ca @atom:ca @atom:ca @atom:ca
+    @improper:ca-ca-ca-ha @atom:ca @atom:ca @atom:ca @atom:ha
+    @improper:ca-ca-ca-nb @atom:ca @atom:ca @atom:ca @atom:nb
+  } # (end of Impropers By Type)
+
+
+  write_once("In Init") {
+    # Default styles and settings for AMBER based force-fields:
+    units           real
+    atom_style      full
+    bond_style      hybrid harmonic
+    angle_style     hybrid harmonic
+    dihedral_style  hybrid fourier
+    improper_style  hybrid harmonic
+    pair_style      hybrid lj/charmm/coul/long 9.0 10.0 10.0
+    kspace_style    pppm 0.0001
+
+    # NOTE: If you do not want to use long-range coulombic forces,
+    #       comment out the two lines above and uncomment this line:
+    #pair_style      hybrid lj/charmm/coul/charmm 9.0 10.0
+
+    pair_modify     mix arithmetic
+    special_bonds   amber
+  }
+
+}
+
+
+
+write_once("log.cite.gaff") {
+  "Development and testing of a general amber force field"
+  J. Wang, R.M. Wolf, J.W. Caldwell, P.A. Kollman, D.A. Case,
+  J.Comp.Chem. 2004, Vol 25, Issue 9, 1157-1174
+  https://doi.org/10.1002/jcc.20035
+
+  Note: Individual force field parameters in the "gaff2.lt" file are
+        sometimes linked to individual papers referred to in the comments
+        (eg. "SOURCE2").  Those references can be found by downloading the
+        "gaff2.dat" file distributed with AmberTools.  (The "gaff2.lt" file used
+        by moltemplate was created converting the "gaff2.dat" into moltemplate
+        format.  In the conversion process, those references were lost.)
+}

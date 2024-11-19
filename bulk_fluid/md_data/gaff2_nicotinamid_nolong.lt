@@ -1,0 +1,226 @@
+#    This is the 1.7 version of GAFF (from AmberTools15), downloaded 2015-8-17.
+####################################################################
+# To use this, LAMMPS currently must be compiled with the USER-MISC package.
+# (Type "make yes-user-misc" into the shell before compiling LAMMPS.)
+####################################################################
+#    This moltemplate (LT) file was generated automatically using
+# amberparm2lt.sh gaff.dat GAFF > gaff.lt
+####################################################################
+#    Background information and usage explanation:
+# This file contanis a list of atom types and rules for generating bonded
+# interactions between these atoms (hopefully) according to AMBER conventions.
+# By using the atom types shown below in your own molecules, bonds and angular
+# interactions will be automatically generated.
+# AMBER (GAFF) force-field parameters will also be assigned to each angle
+# interaction (according to these atom types).
+# One way to apply the GAFF force field to a particular type of molecule, is
+# to use the "inherits" keyword when you define that molecule.  For example:
+# import("gaff.lt")
+# MoleculeType inherits GAFF {
+#   write_once("Data Atoms") {
+#     $atom:C1 $mol:... @atom:cx 0.0 4.183 3.194 13.285
+#     $atom:C2 $mol:... @atom:cx 0.0 4.291 4.618 13.382
+#        :       :         :
+#   }
+# }
+#(See "Inheritance" and "short names vs. full names" in the moltemplate manual.)
+####################################################################
+#    Moltemplate can not assign atom charge.  You must assign atomic
+# charges yourself.  (Moltemplate is only a simple text manipulation tool.)
+# You can do this afterwards using commands like "set atom 70 charge -0.212"
+# For details, see http://lammps.sandia.gov/doc/set.html)
+####################################################################
+#
+# --- Description of atom types ---
+#
+#  @atom:c  Sp2 C carbonyl group
+#  @atom:ca  Sp2 C in pure aromatic systems
+#  @atom:ha  H bonded to aromatic carbon
+#  @atom:hn  H bonded to nitrogen atoms
+#  @atom:n  Sp2 nitrogen in amide groups
+#  @atom:o  Oxygen with one connected atom
+#  @atom:nb 
+#  @atom:h4 
+
+
+
+
+
+GAFF2 {
+
+  # ----------------------------------------------------------------------
+  # The basic atom nomenclature and conventions are explained here:
+  #   http://ambermd.org/antechamber/gaff.pdf
+  # For reference, the original gaff.dat file and format documentation are here:
+  #   http://ambermd.org/AmberTools-get.html
+  #   http://ambermd.org/formats.html#parm.dat
+  # ----------------------------------------------------------------------
+
+  write_once("Data Masses") {
+    @atom:c 12.01
+    @atom:ca 12.01
+    @atom:ha 1.008
+    @atom:hn 1.008
+    @atom:h4 1.008
+    @atom:n 14.01
+    @atom:nb 14.01
+    @atom:o 16.00
+  } # (end of masses)
+
+  write_once("In Settings") {
+    pair_coeff @atom:ha @atom:ha lj/charmm/coul/charmm 0.0150 2.59964245953   # Spellmeyer
+    pair_coeff @atom:hn @atom:hn lj/charmm/coul/charmm 0.0157 1.06907846177   # !Ferguson base pair geom.
+    pair_coeff @atom:o @atom:o lj/charmm/coul/charmm 0.2100 2.95992190115   # OPLS
+    pair_coeff @atom:c @atom:c lj/charmm/coul/charmm 0.0860 3.39966950842   # OPLS
+    pair_coeff @atom:ca @atom:ca lj/charmm/coul/charmm 0.0860 3.39966950842   # OPLS
+    pair_coeff @atom:n @atom:n lj/charmm/coul/charmm 0.1700 3.24999852378   # OPLS
+    pair_coeff @atom:nb @atom:nb lj/charmm/coul/charmm 0.1700 3.24999852378   # OPLS
+    pair_coeff @atom:h4 @atom:h4 lj/charmm/coul/charmm 0.0150 2.51055258772   # Spellmeyer, one electrowithdr. neighbor
+  } # (end of pair_coeffs)
+
+  write_once("In Settings") {
+    bond_coeff @bond:ca-ca harmonic 461.1 1.398   # SOURCE1 6228 0.0147
+    bond_coeff @bond:c-ca harmonic 345.9 1.491   # SOURCE1 480 0.0055
+    bond_coeff @bond:ca-nb harmonic 488.0 1.339  # SOURCE3 1496 0.0045
+    bond_coeff @bond:ca-h4 harmonic 341.5 1.089  # SOURCE3 1496 0.0045
+    bond_coeff @bond:ca-ha harmonic 345.8 1.086   # SOURCE3 1496 0.0045
+    bond_coeff @bond:c-o harmonic 637.7 1.218   # SOURCE1 3682 0.0165
+    bond_coeff @bond:c-n harmonic 427.6 1.379   # SOURCE1 1235 0.0215
+    bond_coeff @bond:hn-n harmonic 403.2 1.013   # SOURCE3 149 0.0098
+  } # (end of bond_coeffs)
+
+  write_once("Data Bonds By Type") {
+    @bond:ca-ca @atom:ca @atom:ca
+    @bond:c-ca @atom:c @atom:ca
+    @bond:ca-nb @atom:ca @atom:nb
+    @bond:ca-h4 @atom:ca @atom:h4
+    @bond:ca-ha @atom:ca @atom:ha
+    @bond:c-o @atom:c @atom:o
+    @bond:c-n @atom:c @atom:n
+    @bond:hn-n @atom:hn @atom:n
+  } # (end of Bonds By Type)
+
+  write_once("In Settings") {
+    angle_coeff @angle:ca-ca-nb harmonic 68.8 122.94   # SOURCE3 2980 0.2511
+    angle_coeff @angle:ca-ca-h4 harmonic 48.1 120.34   # SOURCE3 2980 0.2511
+    angle_coeff @angle:ca-ca-ca harmonic 66.60 120.02   # SOURCE3 1969 0.3480
+    angle_coeff @angle:ca-ca-ha harmonic 48.20 119.88   # SOURCE3 2980 0.2511
+    angle_coeff @angle:ca-c-o harmonic 68.7 122.600   # SOURCE3 18 2.5574
+    angle_coeff @angle:ca-c-n harmonic 67.7 115.25   # SOURCE4 571 1.4648
+    angle_coeff @angle:c-ca-ca harmonic 64.3 120.33   # SOURCE3 40 0.4788
+    angle_coeff @angle:ca-nb-ca harmonic 68.3 117.22   # SOURCE3 2980 0.2511
+    angle_coeff @angle:h4-ca-nb harmonic 51.9 116.03   # SOURCE3 2980 0.2511
+    angle_coeff @angle:c-n-hn harmonic 48.3 117.55   # SOURCE3 157 2.4094
+    angle_coeff @angle:n-c-o harmonic 74.2 123.05   # SOURCE3 221 2.3565
+    angle_coeff @angle:hn-n-hn harmonic 39.6 117.950   # SOURCE3 15 2.3694
+  } # (end of angle_coeffs)
+
+  write_once("Data Angles By Type") {
+    @angle:ca-ca-nb @atom:ca @atom:ca @atom:nb
+    @angle:ca-ca-h4 @atom:ca @atom:ca @atom:h4
+    @angle:ca-ca-ca @atom:ca @atom:ca @atom:ca
+    @angle:ca-ca-ha @atom:ca @atom:ca @atom:ha
+    @angle:ca-c-o @atom:ca @atom:c @atom:o
+    @angle:ca-c-n @atom:ca @atom:c @atom:n
+    @angle:c-ca-ca @atom:c @atom:ca @atom:ca
+    @angle:ca-nb-ca @atom:ca @atom:nb @atom:ca
+    @angle:h4-ca-nb @atom:h4 @atom:ca @atom:nb
+    @angle:c-n-hn @atom:c @atom:n @atom:hn
+    @angle:n-c-o @atom:n @atom:c @atom:o
+    @angle:hn-n-hn @atom:hn @atom:n @atom:hn
+  } # (end of Angles By Type)
+
+  write_once("In Settings") {
+    dihedral_coeff @dihedral:ca-ca-ca-nb fourier 1 3.625 2 180.0    # intrpol.bsd.on C6H6
+    dihedral_coeff @dihedral:c-ca-ca-nb fourier 1 3.625 2 180.0    # intrpol.bsd.on C6H6
+    dihedral_coeff @dihedral:ca-ca-nb-ca fourier 1 4.8 2 180.0    # intrpol.bsd.on C6H6
+    dihedral_coeff @dihedral:h4-ca-nb-ca fourier 1 4.8 2 180.0    # intrpol.bsd.on C6H6
+    dihedral_coeff @dihedral:ca-ca-ca-ha fourier 1 3.625 2 180.0    # intrpol.bsd.on C6H6
+    dihedral_coeff @dihedral:ca-ca-ca-ca fourier 1 3.625 2 180.0    # intrpol.bsd.on C6H6
+    dihedral_coeff @dihedral:o-c-ca-ca fourier 1 1.0 2 180.0    # optimized by Junmei Wang, Jan-2013
+    dihedral_coeff @dihedral:n-c-ca-ca fourier 1 1.0 2 180.0    # optimized by Junmei Wang, Jan-2013
+    dihedral_coeff @dihedral:ca-ca-ca-h4 fourier 1 3.625 2 180.0    # intrpol.bsd.on C6H6
+    dihedral_coeff @dihedral:c-ca-ca-h4 fourier 1 3.625 2 180.0    # intrpol.bsd.on C6H6
+    dihedral_coeff @dihedral:ca-c-n-hn fourier 1 2.5 2 180.0    # AA,NMA (no c-n3, c-n4, c-nh)
+    dihedral_coeff @dihedral:ha-ca-ca-ha fourier 1 3.625 2 180.0    # AA,NMA (no c-n3, c-n4, c-nh)
+    dihedral_coeff @dihedral:ha-ca-ca-nb fourier 1 3.625 2 180.0    # intrpol.bsd.on C6H6
+    dihedral_coeff @dihedral:h4-ca-ca-ha fourier 1 3.625 2 180.0    # AA,NMA (no c-n3, c-n4, c-nh)
+    dihedral_coeff @dihedral:c-ca-ca-ha fourier 1 3.625 2 180.0    # intrpol.bsd.on C6H6
+    dihedral_coeff @dihedral:c-ca-ca-ca fourier 1 3.625 2 180.0    # intrpol.bsd.on C6H6
+    dihedral_coeff @dihedral:hn-n-c-o fourier 2 2.5 2 180.0 2.0 1 0.0    # AA,NMA (no c-n3, c-n4, c-nh)
+  } # (end of dihedral_coeffs)
+
+  write_once("Data Dihedrals By Type") {
+    @dihedral:ca-ca-ca-nb @atom:ca @atom:ca @atom:ca @atom:nb
+    @dihedral:c-ca-ca-nb @atom:c @atom:ca @atom:ca @atom:nb
+    @dihedral:ca-ca-nb-ca @atom:ca @atom:ca @atom:nb @atom:ca
+    @dihedral:h4-ca-nb-ca @atom:h4 @atom:ca @atom:nb @atom:ca
+    @dihedral:ca-ca-ca-ha @atom:ca @atom:ca @atom:ca @atom:ha 
+    @dihedral:ca-ca-ca-ca @atom:ca @atom:ca @atom:ca @atom:ca
+    @dihedral:o-c-ca-ca @atom:o @atom:c @atom:ca @atom:ca
+    @dihedral:n-c-ca-ca @atom:n @atom:c @atom:ca @atom:ca
+    @dihedral:ca-ca-ca-h4 @atom:ca @atom:ca @atom:ca @atom:h4
+    @dihedral:c-ca-ca-h4 @atom:c @atom:ca @atom:ca @atom:h4
+    @dihedral:ca-c-n-hn @atom:ca @atom:c @atom:n @atom:hn
+    @dihedral:ha-ca-ca-ha @atom:ha @atom:ca @atom:ca @atom:ha
+    @dihedral:ha-ca-ca-nb @atom:ha @atom:ca @atom:ca @atom:nb
+    @dihedral:h4-ca-ca-ha @atom:h4 @atom:ca @atom:ca @atom:ha
+    @dihedral:c-ca-ca-ha @atom:c @atom:ca @atom:ca @atom:ha
+    @dihedral:c-ca-ca-ca @atom:c @atom:ca @atom:ca @atom:ca
+    @dihedral:hn-n-c-o @atom:hn @atom:n @atom:c @atom:o
+    @dihedral:hn-n-c-o @atom:hn @atom:n @atom:c @atom:o
+  } # (end of Dihedrals By Type)
+
+  write_once("In Settings") {
+    improper_coeff @improper:c-ca-ca-ca harmonic 1.1 180   # bsd.on C6H6 nmodes
+    improper_coeff @improper:ca-h4-ca-nb harmonic 1.1 180   # bsd.on C6H6 nmodes
+    improper_coeff @improper:ca-ca-ca-ha harmonic 1.1 180   # bsd.on C6H6 nmodes
+    improper_coeff @improper:ca-n-c-o harmonic 10.5 180   # JCC,7,(1986),230
+    improper_coeff @improper:c-hn-n-hn harmonic 1.1 180   # JCC,7,(1986),230
+  } # (end of improper_coeffs)
+
+  write_once("Data Impropers By Type (gaff_imp.py)") {
+    @improper:c-ca-ca-ca @atom:c @atom:ca @atom:ca @atom:ca
+    @improper:ca-h4-ca-nb @atom:ca @atom:h4 @atom:ca @atom:nb
+    @improper:ca-ca-ca-ha @atom:ca @atom:ca @atom:ca @atom:ha
+    @improper:ca-n-c-o @atom:ca @atom:n @atom:c @atom:o
+    @improper:c-hn-n-hn @atom:c @atom:hn @atom:n @atom:hn
+  } # (end of Impropers By Type)
+
+
+  write_once("In Init") {
+    # Default styles and settings for AMBER based force-fields:
+    units           real
+    atom_style      full
+    bond_style      hybrid harmonic
+    angle_style     hybrid harmonic
+    dihedral_style  hybrid fourier
+    improper_style  hybrid harmonic
+    #pair_style      hybrid lj/charmm/coul/long 9.0 10.0 10.0
+    #kspace_style    pppm 0.0001
+
+    # NOTE: If you do not want to use long-range coulombic forces,
+    #       comment out the two lines above and uncomment this line:
+    pair_style      hybrid lj/charmm/coul/charmm 9.0 10.0
+
+    pair_modify     mix arithmetic
+    special_bonds   amber
+  }
+
+}
+
+
+
+write_once("log.cite.gaff") {
+  "Development and testing of a general amber force field"
+  J. Wang, R.M. Wolf, J.W. Caldwell, P.A. Kollman, D.A. Case,
+  J.Comp.Chem. 2004, Vol 25, Issue 9, 1157-1174
+  https://doi.org/10.1002/jcc.20035
+
+  Note: Individual force field parameters in the "gaff2.lt" file are
+        sometimes linked to individual papers referred to in the comments
+        (eg. "SOURCE2").  Those references can be found by downloading the
+        "gaff2.dat" file distributed with AmberTools.  (The "gaff2.lt" file used
+        by moltemplate was created converting the "gaff2.dat" into moltemplate
+        format.  In the conversion process, those references were lost.)
+}

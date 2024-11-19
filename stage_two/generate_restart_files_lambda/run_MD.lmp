@@ -1,0 +1,69 @@
+  variable          T_sample      equal _T_SAMPLE    # Temperature
+  variable          t_run  equal _N_STEPS     # number of MD steps
+  variable          t_print equal ${t_run}/200  #how often to print histogram
+  variable          t_restart equal _STEPS_RESTART
+
+  # weaken intermolecular interactions
+  variable  eta equal 0.1
+  variable 	lbda equal 1.0
+
+  variable 	scale_lj equal ${eta}
+  variable 	scale_coulomb equal (${eta})^2
+
+  # Load old function definitions.
+  include "new_system.in.init"
+
+  # Read data.
+  read_data "cluster_stage_one_generate.data"
+
+  # Switch to hybrid/scaled style from original hybrid style.
+  # This allows to adapt the LJ and Coulombic interactions differently.
+  # Parameters taken from new_system.in.init
+  pair_style hybrid/scaled v_scale_lj lj/charmm 9.0 10.0 10.0 v_scale_coulomb coul/long/charmm 9.0 10.0 10.0
+
+  # load force field parameters
+  include "system.in.settings.hybrid_overlay"
+
+  # load additional atoms and force field parameters
+  include "create_atoms.txt"
+
+  kspace_style    pppm 0.0001
+  comm_style tiled
+  balance 1.1 rcb
+
+  reset_timestep    0
+
+#--------------------------- Thermo stylepa and settings -------------------------#
+  timestep          1.0
+  compute mobileTemp mobile temp
+  compute staticTemp stat temp
+  thermo_style      custom step time vol temp press ke pe etotal epair emol vol density cella cellb cellc cellalpha cellbeta cellgamma c_mobileTemp c_staticTemp v_scale_lj v_scale_coulomb v_scale_gauss v_lambda
+  thermo            200
+
+
+#--------------------------- Computes ------------------------------------------#
+
+  compute       cc1 all chunk/atom molecule
+  compute myChunk all temp/chunk cc1 temp kecom internal
+
+  fix 1 all ave/time ${t_print} 1 ${t_print} c_myChunk[*] file tmp.out mode vector
+
+  dump              d2 all custom ${t_print} traj.dump id mol type xu yu zu
+
+#---------------------- Thermostat & Barostat ----------------------------------#
+
+  fix              f2 mobile nvt temp ${T_sample} ${T_sample} $(100.0*dt)
+  compute      tempcom mobile temp/com
+  fix_modify   f2 temp tempcom
+
+  fix f3 mobile adapt 1 kspace v_scale_coulomb scale yes
+
+  fix f4 all deform 1 x final 0.0 _X_LENGTH y final 0.0 _Y_LENGTH z final 0.0 _Z_LENGTH xy final 0.0 xz final 0.0 yz final 0.0 remap v units box
+
+  restart         ${t_restart} stage_two.restart
+
+  run               ${t_run}
+
+  write_data        cluster_stage_two_generate.data
+
+  write_restart   cluster_stage_two_generate.restart

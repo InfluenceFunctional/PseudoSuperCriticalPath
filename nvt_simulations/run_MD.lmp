@@ -1,0 +1,43 @@
+  variable          T_sample      equal _T_SAMPLE    # Temperature
+  variable          t_run  equal _N_STEPS     # number of MD steps
+  variable          t_print equal 200  #how often to print histogram
+
+  read_restart _RESTART_FILE
+
+  # load force field parameters
+  include "system.in.settings"
+
+  kspace_style    pppm 0.0001
+  comm_style tiled
+  balance 1.1 rcb
+
+  reset_timestep    0
+
+#--------------------------- Thermo stylepa and settings -------------------------#
+  timestep          1.0
+  thermo_style      custom step time vol temp press ke pe etotal epair emol vol density cella cellb cellc cellalpha cellbeta cellgamma
+  thermo            200
+
+
+#--------------------------- Computes ------------------------------------------#
+
+  compute       cc1 all chunk/atom molecule
+  compute myChunk all temp/chunk cc1 temp kecom internal
+
+  fix 1 all ave/time ${t_print} 1 ${t_print} c_myChunk[*] file tmp.out mode vector
+  fix 2 all momentum 100 linear 1 1 1 angular rescale
+
+  dump              d2 all custom ${t_print} traj.dump id mol element xu yu zu
+
+  dump_modify       d2 element 1 2 3
+
+#---------------------- Thermostat & Barostat ----------------------------------#
+fix              f2 all nvt temp ${T_sample} ${T_sample} $(100.0*dt)
+#_NPT_TRI fix recenter2 all recenter INIT INIT INIT units box
+
+
+  run               ${t_run}
+
+  write_data        cluster_equi_nvt.data
+
+  write_restart   cluster_equi_nvt.restart
