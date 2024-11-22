@@ -173,14 +173,14 @@ def main():
 
     x_length, y_length, z_length = extract_box_lengths(equil_fluid_data_file)
 
-    copy(old_data_file, f"/cluster_stage_one_generate.data")
-    copy(init_settings, f"/new_system.in.init")
+    copy(old_data_file, f"cluster_stage_one_generate.data")
+    copy(init_settings, f"new_system.in.init")
     # generate_system_settings_file(f"/{new_settings}", old_settings,
     #                               init_settings)
     # number_new_types = generate_create_atoms(f"/{new_atoms}", nvt_mean_positions,
     #                                          find_hydrogen_type(topology_file))
 
-    with open("run_MD.lmp", "r") as read, open(f"/run_MD.lmp", "w") as write:
+    with open("run_MD_template.lmp", "r") as read, open(f"run_MD.lmp", "w") as write:
         text = read.read()
         text = text.replace("_T_SAMPLE", str(reference_temperature))
         text = text.replace("_N_STEPS", str(number_steps))
@@ -194,10 +194,10 @@ def main():
 
     copy(slurm_file, f"/sub_job.slurm")
 
-    d = os.getcwd()
-    os.chdir(f"")
-    os.system("sbatch sub_job.slurm")
-    os.chdir(d)
+    # d = os.getcwd()
+    # os.chdir(f"")
+    # os.system("sbatch sub_job.slurm")
+    # os.chdir(d)
 
 
 if __name__ == '__main__':

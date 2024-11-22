@@ -1,7 +1,7 @@
-  variable          T_sample      equal 400    # Temperature
-  variable          t_run  equal 2000000     # number of MD steps
+  variable          T_sample      equal _T_SAMPLE    # Temperature
+  variable          t_run  equal _N_STEPS     # number of MD steps
   variable          t_print equal ${t_run}/200  #how often to print histogram
-  variable          t_restart equal 20000
+  variable          t_restart equal _STEPS_RESTART
 
   # weaken intermolecular interactions
   variable  eta equal 0.1
@@ -58,7 +58,7 @@
 
   fix f3 mobile adapt 1 kspace v_scale_coulomb scale yes
 
-  fix f4 all deform 1 x final 0.0 50.80526319733517 y final 0.0 55.390958685950736 z final 0.0 68.86237154698166 xy final 0.0 xz final 0.0 yz final 0.0 remap v units box
+  fix f4 all deform 1 x final 0.0 _X_LENGTH y final 0.0 _Y_LENGTH z final 0.0 _Z_LENGTH xy final 0.0 xz final 0.0 yz final 0.0 remap v units box
 
   restart         ${t_restart} stage_two.restart
 
