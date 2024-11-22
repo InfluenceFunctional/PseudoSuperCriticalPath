@@ -159,6 +159,7 @@ def main():
     equil_fluid_data_file = "../../bulk_fluid/0/cluster_1x1x1_equi.data"
     dense_weak_fluid_directory = f"../../stage_one/generate_restart_files_lambda/well_width_4.0/"
     init_settings = "../../bulk_solid/0/new_system.in.init"
+    init_ff = "../../stage_one/generate_restart_files_lambda/well_width_4.0/system.in.settings.hybrid_overlay"
     # topology_file = "../../bulk_solid/0/new_system.data"
     # old_settings = f"{fluid_directory}system.in.settings.hybrid_overlay"
     old_data_file = f"{dense_weak_fluid_directory}cluster_stage_one_generate.data"
@@ -175,6 +176,8 @@ def main():
 
     copy(old_data_file, f"cluster_stage_one_generate.data")
     copy(init_settings, f"new_system.in.init")
+    copy(init_ff, f"system.in.settings.hybrid_overlay")
+
     # generate_system_settings_file(f"/{new_settings}", old_settings,
     #                               init_settings)
     # number_new_types = generate_create_atoms(f"/{new_atoms}", nvt_mean_positions,
