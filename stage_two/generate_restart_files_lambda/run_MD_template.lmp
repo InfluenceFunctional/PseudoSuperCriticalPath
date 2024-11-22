@@ -5,7 +5,7 @@
 
   # weaken intermolecular interactions
   variable  eta equal 0.1
-  variable 	lbda equal 1.0
+  variable  lambda equal ramp(0.0,1.0)
 
   variable 	scale_lj equal ${eta}
   variable 	scale_coulomb equal (${eta})^2
