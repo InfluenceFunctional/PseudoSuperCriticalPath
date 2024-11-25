@@ -7,8 +7,8 @@
   variable eta_c equal 0.1
   variable lambda equal ramp(0.0,1.0)
 
-  variable scale_lj equal ${eta_lj}+v_lambda*(1.0-${eta})
-  variable scale_coulomb equal (${eta_c}+v_lambda*(1.0-${eta}))^2
+  variable scale_lj equal ${eta_lj}+v_lambda*(1.0-${eta_lj})
+  variable scale_coulomb equal (${eta_c}+v_lambda*(1.0-${eta_c}))^2
   variable scale_gauss equal 0
 
   # Load old function definitions.
