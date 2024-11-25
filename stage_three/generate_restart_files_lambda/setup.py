@@ -138,6 +138,8 @@ def main():
     dense_weak_fluid_directory = f"../../stage_two/generate_restart_files_lambda/"
     init_settings = "../../bulk_solid/0/new_system.in.init"
     old_data_file = f"{dense_weak_fluid_directory}cluster_stage_two_generate.data"
+    init_ff = "../../stage_one/generate_restart_files_lambda/well_width_4.0/system.in.settings.hybrid_overlay"
+    init_atoms = "../../stage_one/generate_restart_files_lambda/well_width_4.0/create_atoms.txt"
     slurm_file = "sub_job.slurm"
 
     number_steps = 2000000
@@ -145,6 +147,8 @@ def main():
 
     copy(old_data_file, f"cluster_stage_two_generate.data")
     copy(init_settings, f"new_system.in.init")
+    copy(init_ff, f"system.in.settings.hybrid_overlay")
+    copy(init_atoms, f"create_atoms.txt")
 
     with open("run_MD_template.lmp", "r") as read, open(f"run_MD.lmp", "w") as write:
         text = read.read()
