@@ -9,7 +9,7 @@
   variable 	scale_coulomb equal (${eta})^2
   variable scale_gauss equal 0
 
-  read_restart _RESTART_FILE  #read_restart	restart.500000
+  read_restart _RESTART_FILE
 
 
   # Switch to hybrid/scaled style from original hybrid style.

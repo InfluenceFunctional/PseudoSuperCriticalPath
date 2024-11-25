@@ -36,7 +36,7 @@ def main():
             text = text.replace("_T_SAMPLE", str(reference_temperature))
             text = text.replace("_N_STEPS", str(number_steps))
             text = text.replace("_LAMBDA", str(current_lambda))
-            text = text.replace("_RESTART_FILE", f"stage_three.restart.{current_restart_step}")
+            text = text.replace("_RESTART_FILE", f"stage_two.restart.{current_restart_step}")
             write.write(text)
 
         copy("sub_job.slurm", f"lambda_{current_lambda_str}/sub_job.slurm")
