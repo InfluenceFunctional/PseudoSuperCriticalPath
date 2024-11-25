@@ -135,7 +135,7 @@ def generate_create_atoms(filename: str, mean_positions_file: str, hydrogen_type
 def main():
     reference_temperature = 400
 
-    dense_weak_fluid_directory = f"../../stage_two/generate_restart_files_lambda//"
+    dense_weak_fluid_directory = f"../../stage_two/generate_restart_files_lambda/"
     init_settings = "../../bulk_solid/0/new_system.in.init"
     old_data_file = f"{dense_weak_fluid_directory}cluster_stage_two_generate.data"
     slurm_file = "sub_job.slurm"
@@ -143,10 +143,10 @@ def main():
     number_steps = 2000000
     number_restart_steps = 20000  # 100 restart files
 
-    copy(old_data_file, f"/cluster_stage_two_generate.data")
-    copy(init_settings, f"/new_system.in.init")
+    copy(old_data_file, f"cluster_stage_two_generate.data")
+    copy(init_settings, f"new_system.in.init")
 
-    with open("run_MD.lmp", "r") as read, open(f"/run_MD.lmp", "w") as write:
+    with open("run_MD_template.lmp", "r") as read, open(f"run_MD.lmp", "w") as write:
         text = read.read()
         text = text.replace("_T_SAMPLE", str(reference_temperature))
         text = text.replace("_N_STEPS", str(number_steps))
@@ -155,12 +155,12 @@ def main():
 
         write.write(text)
 
-    copy(slurm_file, f"/sub_job.slurm")
-
-    d = os.getcwd()
-    os.chdir(f"")
-    os.system("sbatch sub_job.slurm")
-    os.chdir(d)
+    # copy(slurm_file, f"sub_job.slurm")
+    #
+    # d = os.getcwd()
+    # os.chdir(f"")
+    # os.system("sbatch sub_job.slurm")
+    # os.chdir(d)
 
 
 if __name__ == '__main__':
