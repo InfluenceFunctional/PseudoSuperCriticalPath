@@ -14,7 +14,7 @@ def main():
         current_lambda_str = str(current_lambda)
 
         try:
-            os.mkdir(f"/lambda_{current_lambda_str}")
+            os.mkdir(f"lambda_{current_lambda_str}")
         except FileExistsError:
             pass
 
