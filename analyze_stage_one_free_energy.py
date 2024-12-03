@@ -76,6 +76,10 @@ def main():
                  color=f"C{directory_index}", linestyle="--")
         plt.plot(temperatures, heat_capacity, color=f"C{directory_index}", linestyle=":")
 
+        # read in stage 1 screen.log and implement eqn 7 with explicit rescaling
+        # then mbar matrix in lambda x timeseries
+        # stage 2 will be equation 17
+
     plt.xlabel("Temperature (K)")
     plt.ylabel("Dimensionless free energy difference per molecule")
     plt.legend()

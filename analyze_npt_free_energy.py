@@ -49,6 +49,7 @@ def main():
             assert len(data_series) == np.sum(n_k)
             print("Finished reading timeseries.")
 
+        # eqn 2 in the paper
         ukn = np.zeros((len(temperatures), len(data_series)))
         for i, temperature in enumerate(temperatures):
             beta = (1.0 / (unit.BOLTZMANN_CONSTANT_kB

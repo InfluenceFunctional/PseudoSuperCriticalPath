@@ -42,10 +42,10 @@ def main():
 
         copy("sub_job.slurm", f"lambda_{current_lambda_str}/sub_job.slurm")
 
-        # d = os.getcwd()
-        # os.chdir(f"/lambda_{current_lambda_str}")
-        # os.system("sbatch sub_job.slurm")
-        # os.chdir(d)
+        d = os.getcwd()
+        os.chdir(f"lambda_{current_lambda_str}")
+        os.system("sbatch sub_job.slurm")
+        os.chdir(d)
 
 
 if __name__ == '__main__':
