@@ -8,6 +8,7 @@ from pymbar import timeseries
 from analyze import compose_row_function
 
 
+plt.rcParams.update(plt.rcParamsDefault)
 
 def main():
     temperature_step = 10  # Kelvin
@@ -38,7 +39,8 @@ def main():
                 data_full = (data["PotEng"].to_numpy() * unit.kilocalorie_per_mole +
                              pressure * data["Volume"].to_numpy()
                              * unit.AVOGADRO_CONSTANT_NA * (unit.atmosphere * unit.angstrom ** 3))
-                t0, g, Neff_max = timeseries.detect_equilibration(data_full)  # compute indices of uncorrelated timeseries
+                t0, g, Neff_max = timeseries.detect_equilibration(
+                    data_full)  # compute indices of uncorrelated timeseries
                 data_equil = data_full[t0:]
                 indices = timeseries.subsample_correlated_data(data_equil, g=g)
                 data = data_equil[indices]

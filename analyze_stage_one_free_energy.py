@@ -6,85 +6,297 @@ import pymbar
 from openmm import unit
 from pymbar import timeseries
 from analyze import compose_row_function
-
-
+from pathlib import Path
+from tqdm import tqdm
 
 plt.rcParams.update({
     "text.usetex": False,
     "font.family": "sans-serif",
     "text.latex.preamble": r"\usepackage{siunitx} \DeclareSIUnit{\atm}{atm} \DeclareSIUnit{\cal}{cal}"
 })
+plt.rcParams.update(plt.rcParamsDefault)
 
 
 def main():
-    lambda_step = 0.01
-    temperature_step = 10  # Kelvin
-    minimum_temperature = 300  # Kelvin
-    maximum_temperature = 500  # Kelvin
-    pressure = 1.0  # atm
-    temperatures = np.arange(minimum_temperature, maximum_temperature + temperature_step, temperature_step)
-    fluid_directory = "npt_simulations/fluid"
-    solid_directory = "npt_simulations/solid"
+    # lambda_step = 0.01
+    # lambdas = np.linspace(lambda_step, 1, int(1/lambda_step))
+    lmax = 1
+    well_width = "0.09"
+    mbar_init = "BAR"  # "BAR" "zeros"
+    num_samples_list = [50]
+    directory = Path("stage_one_fixed/runs_at_each_lambda/well_width_" + well_width)
 
+    lambda_dirs = os.listdir(directory)
+    lambda_dirs = [dir for dir in lambda_dirs if "lambda_" in dir]
+    lambdas = np.sort([float(dir.split('_')[-1]) for dir in lambda_dirs])
+
+    temperature = 400  # kelvin
+    pressure = 1.0  # atm
     number_molecules = np.loadtxt("npt_simulations/fluid/T_300/tmp.out", skiprows=3, max_rows=1, dtype=int)[1]
 
-    for directory_index, directory in enumerate((fluid_directory, solid_directory)):
-        if os.path.isfile(f"{directory}/flat_data_series.txt") and os.path.isfile(f"{directory}/n_k.txt"):
-            data_series = np.loadtxt(f"{directory}/flat_data_series.txt")
-            n_k = np.loadtxt(f"{directory}/n_k.txt", dtype=int)
-            assert len(data_series) == np.sum(n_k)
-        else:
-            print("Reading timeseries.")
-            data_series = np.empty(0)
-            n_k = np.empty(0, dtype=int)
-            for temperature in temperatures:
-                assert (np.loadtxt(f"{directory}/T_{temperature}/tmp.out", skiprows=3, max_rows=1, dtype=int)[1]
-                        == number_molecules)
-                log_file = f"{directory}/T_{temperature}/screen.log"
-                # noinspection PyTypeChecker
-                data = pd.read_csv(log_file, skiprows=compose_row_function(log_file, True), sep=r"\s+")
-                data_full = (data["PotEng"].to_numpy() * unit.kilocalorie_per_mole +
-                             pressure * data["Volume"].to_numpy()
-                             * unit.AVOGADRO_CONSTANT_NA * (unit.atmosphere * unit.angstrom ** 3))
-                t0, g, Neff_max = timeseries.detect_equilibration(
-                    data_full)  # compute indices of uncorrelated timeseries
-                data_equil = data_full[t0:]
-                indices = timeseries.subsample_correlated_data(data_equil, g=g)
-                data = data_equil[indices]
-                n_k = np.append(n_k, len(data))
-                data_series = np.append(data_series, data)
-            np.savetxt(f"{directory}/flat_data_series.txt", data_series)
-            np.savetxt(f"{directory}/n_k.txt", n_k, fmt="%i")
-            assert len(data_series) == np.sum(n_k)
-            print("Finished reading timeseries.")
+    if os.path.isfile(f"{directory}/flat_coul_series.txt") and os.path.isfile(f"{directory}/n_k.txt"):
+        coul_series = np.loadtxt(f"{directory}/flat_coul_series.txt")
+        lj_series = np.loadtxt(f"{directory}/flat_lj_series.txt")
+        gauss_series = np.loadtxt(f"{directory}/flat_gauss_series.txt")
+        scale_series = np.loadtxt(f"{directory}/scale_series.txt")
+        n_k = np.loadtxt(f"{directory}/n_k.txt", dtype=int)
+        assert len(coul_series) == np.sum(n_k)
+    else:
+        print("Reading timeseries.")
+        coul_series = np.empty(0)
+        lj_series = np.empty(0)
+        gauss_series = np.empty(0)
+        n_k = np.empty(0, dtype=int)
+        scale_series = np.zeros((len(lambdas), 4))
+        for ind, lmbd in enumerate(tqdm(lambdas)):
+            run_directory = Path(f"{directory}/lambda_{lmbd:.2g}")
+            if lmbd == 1:
+                run_directory = Path(f"{directory}/lambda_{lmbd:.2g}.0")
+            assert (np.loadtxt(run_directory.joinpath("tmp.out"), skiprows=3, max_rows=1, dtype=int)[1]
+                    == number_molecules)
+            log_file = run_directory.joinpath("screen.log")
+            # noinspection PyTypeChecker
+            try:
+                data = pd.read_csv(log_file, skiprows=compose_row_function(log_file, False), sep=r"\s+")
+            except ValueError as e:
+                if str(e) == "No valid rows found":
+                    lambdas = lambdas[lambdas != lmbd]
+                    print(str(e))
+                    continue
+                else:
+                    raise e
 
-        ukn = np.zeros((len(temperatures), len(data_series)))
-        for i, temperature in enumerate(temperatures):
-            beta = (1.0 / (unit.BOLTZMANN_CONSTANT_kB
-                           * (temperature * unit.kelvin)
-                           * unit.AVOGADRO_CONSTANT_NA)).value_in_unit(unit.kilocalorie_per_mole ** (-1))
-            ukn[i, :] = beta * data_series[:]
+            intra_energy = data['E_mol'].to_numpy() * unit.kilocalorie_per_mole
+            coul_energy = (data['c_coul'] + data['E_long']).to_numpy() * unit.kilocalorie_per_mole
+            gauss_energy = data['c_gauss'].to_numpy() * unit.kilocalorie_per_mole
+            lj_energy = data['c_lj'].to_numpy() * unit.kilocalorie_per_mole
+            scale_series[ind, :] = [data['v_scale_coulomb'][0], data['v_scale_lj'][0], data['v_scale_gauss'][0], lmbd]
+            data_full = (
+                    coul_energy + gauss_energy + lj_energy
+            )
+            t0, g, Neff_max = timeseries.detect_equilibration(data_full)  # compute indices of uncorrelated timeseries
+            coul_indices = timeseries.subsample_correlated_data(coul_energy[t0:], g=g)
+            coul_data = coul_energy[t0:][coul_indices]
+            lj_indices = timeseries.subsample_correlated_data(lj_energy[t0:], g=g)
+            lj_data = lj_energy[t0:][lj_indices]
+            gauss_indices = timeseries.subsample_correlated_data(gauss_energy[t0:], g=g)
+            gauss_data = gauss_energy[t0:][gauss_indices]
 
-        mbar = pymbar.MBAR(ukn, n_k, initialize="BAR")
+            n_k = np.append(n_k, len(gauss_data))
+            coul_series = np.append(coul_series, coul_data)
+            lj_series = np.append(lj_series, lj_data)
+            gauss_series = np.append(gauss_series, gauss_data)
+        scale_series = np.delete(scale_series, np.argwhere(scale_series.sum(axis=1) == 0), axis=0)  # delete unused rows
+        np.savetxt(f"{directory}/flat_coul_series.txt", coul_series)
+        np.savetxt(f"{directory}/flat_lj_series.txt", lj_series)
+        np.savetxt(f"{directory}/flat_gauss_series.txt", gauss_series)
+        np.savetxt(f"{directory}/n_k.txt", n_k, fmt="%i")
+        np.savetxt(f"{directory}/scale_series.txt", scale_series)
+        assert len(coul_series) == np.sum(n_k)
+        print("Finished reading timeseries.")
+
+    lambdas = scale_series[:, 3]
+    lambdas = lambdas[lambdas <= lmax]
+
+    c_ens = np.zeros(len(lambdas))
+    place = 0
+    for ind in range(len(lambdas)):
+        c_ens[ind] = np.mean(coul_series[place:place + n_k[ind]])
+        place += n_k[ind]
+
+    lj_ens = np.zeros(len(lambdas))
+    place = 0
+    for ind in range(len(lambdas)):
+        lj_ens[ind] = np.mean(lj_series[place:place + n_k[ind]])
+        place += n_k[ind]
+
+    g_ens = np.zeros(len(lambdas))
+    place = 0
+    for ind in range(len(lambdas)):
+        g_ens[ind] = np.mean(gauss_series[place:place + n_k[ind]])
+        place += n_k[ind]
+
+    import plotly.graph_objects as go
+    fig = go.Figure()
+    fig.add_scatter(x=lambdas, y=c_ens / number_molecules, name='Coul Energy')
+    fig.add_scatter(x=lambdas, y=lj_ens / number_molecules, name='LJ Energy')
+    fig.add_scatter(x=lambdas, y=g_ens / number_molecules, name='Gauss Energy')
+    fig.show(renderer='browser')
+
+    ukn = np.zeros((len(lambdas), len(coul_series)))
+    beta = (1.0 / (unit.BOLTZMANN_CONSTANT_kB
+                   * (temperature * unit.kelvin)
+                   * unit.AVOGADRO_CONSTANT_NA)).value_in_unit(unit.kilocalorie_per_mole ** (-1))
+    for i, lmbd in enumerate(lambdas):
+        energy = (scale_series[i, 0] * coul_series +
+                  scale_series[i, 1] * lj_series +
+                  scale_series[i, 2] * gauss_series)
+
+        ukn[i, :] = beta * energy
+
+    max_ind = np.sum(n_k[:len(lambdas)])
+    n_k = n_k[:len(lambdas)]
+    ukn = ukn[:, :max_ind]
+
+    from plotly.subplots import make_subplots
+    import plotly.graph_objects as go
+    k_vals = np.linspace(0, len(lambdas) - 2, 25).astype(int)
+    batch = np.repeat(np.arange(len(lambdas)), n_k, axis=0)
+
+    fig = make_subplots(rows=5, cols=5, subplot_titles=[f"Lambda = {k / 100:.2g}" for k in k_vals])
+    for ind in range(25):
+        row = ind // 5 + 1
+        col = ind % 5 + 1
+        k_ind = k_vals[ind]
+
+        fig.add_histogram(x=ukn[k_ind, batch == k_ind], nbinsx=50, row=row, col=col, name="Current",
+                          legendgroup="Current", marker_color='red', showlegend=ind == 0)
+        fig.add_histogram(x=ukn[k_ind + 1, batch == k_ind + 1], nbinsx=50, row=row, col=col, name="Next",
+                          legendgroup="Next", marker_color='blue', showlegend=ind == 0)
+    fig.show()
+
+    import plotly.graph_objects as go
+
+    fig = go.Figure()
+    batch = np.repeat(np.arange(len(lambdas)), n_k, axis=0)
+    overlap = np.zeros(len(lambdas) - 1)
+    for ind in range(len(lambdas) - 1):
+        h1, b1 = np.histogram(ukn[ind, batch == ind], bins=50, density=True)
+        h2, _ = np.histogram(ukn[ind + 1, batch == ind + 1], bins=50, density=True, range=[b1[0], b1[-1]])
+
+        h3, b1 = np.histogram(ukn[ind + 1, batch == ind + 1], bins=50, density=True)
+        h4, _ = np.histogram(ukn[ind, batch == ind], bins=50, density=True, range=[b1[0], b1[-1]])
+        overlap[ind] = (np.nan_to_num(np.sum(np.minimum(h1, h2))) + np.nan_to_num(np.sum(np.minimum(h3, h4)))) / 2
+
+    fig.add_scatter(x=lambdas, y=overlap, name="Nearest-Neighbor Overlap")
+    fig.add_scatter(x=lambdas, y=np.diff(scale_series[:, 0]), name='Coul Slope')
+    fig.add_scatter(x=lambdas, y=np.diff(scale_series[:, 1]), name='LJ Slope')
+    fig.add_scatter(x=lambdas, y=np.diff(scale_series[:, 2]), name='Gauss Slope')
+    fig.show()
+
+
+    # subsample ukns
+    for max_samples in num_samples_list:
+        sample_inds = []
+        new_nk = []
+        cum_nk = np.concatenate([np.zeros(1), np.cumsum(n_k)]).astype(int)
+        for ind, n_of_k in enumerate(n_k):
+            samples_to_add = np.linspace(0, n_of_k - 1, min(max_samples, n_of_k)).astype(int)
+            sample_inds.append(cum_nk[ind] + samples_to_add)
+            new_nk.append(len(samples_to_add))
+
+        sample_inds = np.concatenate(sample_inds)
+        new_ukn = ukn[:, sample_inds]
+        new_nk = np.array(new_nk)
+
+        mbar = pymbar.MBAR(new_ukn, new_nk, initialize=mbar_init)
         result = mbar.compute_free_energy_differences()
-        plt.errorbar(temperatures, result["Delta_f"][0, :] / number_molecules,
-                     yerr=result["dDelta_f"][0, :] / number_molecules, label=directory,
-                     color=f"C{directory_index}")
-        entropy = -np.gradient(result["Delta_f"][0, :], temperature_step)
-        heat_capacity = temperatures * np.gradient(entropy, temperature_step)
-        plt.plot(temperatures, -np.gradient(result["Delta_f"][0, :], temperature_step),
-                 color=f"C{directory_index}", linestyle="--")
-        plt.plot(temperatures, heat_capacity, color=f"C{directory_index}", linestyle=":")
+        # plt.errorbar(lambdas, result["Delta_f"][0, :] / number_molecules,
+        #              yerr=result["dDelta_f"][0, :] / number_molecules, label=directory,
+        #              )
+        # #color=f"C{directory_index}")
+        # # entropy = -np.gradient(result["Delta_f"][0, :], np.diff(lambdas)[0])
+        # # heat_capacity = lambdas * np.gradient(entropy, np.diff(lambdas)[0])
+        # # plt.plot(lambdas, -np.gradient(result["Delta_f"][0, :], np.diff(lambdas)[0]),
+        # #          #color=f"C{directory_index}",
+        # #          linestyle="--")
+        # # plt.plot(lambdas, heat_capacity,
+        # #          #color=f"C{directory_index}",
+        # #          linestyle=":")
+        #
+        # # read in stage 1 screen.log and implement eqn 7 with explicit rescaling
+        # # then mbar matrix in lambda x timeseries
+        # # stage 2 will be equation 17
+        #
+        # plt.xlabel("Lambda")
+        # plt.ylabel("Dimensionless free energy difference per molecule")
+        # plt.legend()
+        # plt.savefig(f"stage_one_{max_samples}_{well_width}.pdf", bbox_inches="tight")
+        # plt.close()
 
-        # read in stage 1 screen.log and implement eqn 7 with explicit rescaling
-        # then mbar matrix in lambda x timeseries
-        # stage 2 will be equation 17
+        # opt plot overlap matrix
+        import plotly.graph_objects as go
+        from plotly.subplots import make_subplots
+        overlap = mbar.compute_overlap()
+        fig = make_subplots(rows=1, cols=3)
+        fig.add_scatter(x=lambdas, y=result['Delta_f'][0, :] / number_molecules,
+                        error_y=dict(type='data', array=[result['dDelta_f'][0, :] / number_molecules], visible=True),
+                        showlegend=False,
+                        row=1, col=1
+                        )
 
-    plt.xlabel("Temperature (K)")
-    plt.ylabel("Dimensionless free energy difference per molecule")
-    plt.legend()
-    plt.savefig("test.pdf", bbox_inches="tight")
-    plt.close()
+        fig.add_heatmap(z=overlap['matrix'], y=lambdas, x=lambdas, text=np.round(overlap['matrix'], 2),
+                        texttemplate="%{text:.2g}", showscale=False, showlegend=False,
+                        colorscale='blues', row=1, col=2)
+
+        fig.add_scatter(x=lambdas, y=scale_series[:, 0], name='Coul Scale', row=1, col=3)
+        fig.add_scatter(x=lambdas, y=scale_series[:, 1], name='LJ Scale', row=1, col=3)
+        fig.add_scatter(x=lambdas, y=scale_series[:, 2], name='Gauss Scale', row=1, col=3)
+        fig.update_layout(xaxis1_title='Lambda', yaxis1_title='Free Energy Difference',
+                          xaxis2_title='Lambda', yaxis2_title='Lambda',
+                          xaxis3_title='Lambda', yaxis3_title='Scaling Factor')
+        fig.show(renderer='browser')
+
+        aa = 1
+
+    def plot_run_thermo(lmbd):
+        """
+        Utility function to plot the thermo data for a particular run
+        :param lmbd:
+        :return:
+        """
+        directory = Path("stage_one_fixed/runs_at_each_lambda/well_width_" + well_width)
+
+        lambda_dirs = os.listdir(directory)
+        lambda_dirs = [dir for dir in lambda_dirs if "lambda_" in dir]
+        number_molecules = np.loadtxt("npt_simulations/fluid/T_300/tmp.out", skiprows=3, max_rows=1, dtype=int)[1]
+        run_directory = Path(f"{directory}/lambda_{lmbd:.2g}")
+        log_file = run_directory.joinpath("screen.log")
+        data = pd.read_csv(log_file, skiprows=compose_row_function(log_file, False), sep=r"\s+")
+
+        import plotly.graph_objects as go
+        from plotly.subplots import make_subplots
+        rows = 3
+        cols = 4
+        keys_to_plot = ['E_pair', 'E_vdw', 'Press', 'E_coul', 'E_long', 'E_mol', 'c_lj', 'c_coul', 'c_gauss', 'KinEng',
+                        'PotEng', 'TotEng']
+        fig = make_subplots(rows=rows, cols=cols, subplot_titles=keys_to_plot)
+
+        for ind, k1 in enumerate(keys_to_plot):
+            row = ind // cols + 1
+            col = ind % cols + 1
+            fig.add_scatter(x=data['Time'], y=data[k1], showlegend=False, row=row, col=col)
+
+        fig.show()
+
+    # for lmbd in [0.68, 0.69, 0.70, 0.71, 0.72]:
+    #     plot_run_thermo(lmbd)
+
+    def analyze_gen_runs():
+        for run_directory in [r'D:\crystal_datasets\pscp\stage_one_fixed\generate_restart_files_lambda\well_width_4.0',
+                              r'D:\crystal_datasets\pscp\stage_one_fixed\generate_restart_files_lambda\well_width_0.9',
+                              r'D:\crystal_datasets\pscp\stage_one_fixed\generate_restart_files_lambda\well_width_0.09']:
+            run_directory = Path(run_directory)
+            log_file = run_directory.joinpath("screen.log")
+            data = pd.read_csv(log_file, skiprows=compose_row_function(log_file, False), sep=r"\s+")
+
+            import plotly.graph_objects as go
+            from plotly.subplots import make_subplots
+
+            rows = 2
+            cols = 5
+            keys_to_plot = ['E_pair', 'Volume', 'Temp', 'Press', 'KinEng', 'PotEng', 'TotEng', 'E_mol', 'E_pair_grad',
+                            'P_grad']
+            data['E_pair_grad'] = np.gradient(data['E_pair'])
+            data['P_grad'] = np.gradient(data['Press'])
+            fig = make_subplots(rows=rows, cols=cols, subplot_titles=keys_to_plot)
+
+            for ind, k1 in enumerate(keys_to_plot):
+                row = ind // cols + 1
+                col = ind % cols + 1
+                fig.add_scatter(x=data['Time'], y=data[k1], showlegend=False, row=row, col=col)
+
+            fig.show(renderer='browser')
 
 
 if __name__ == '__main__':

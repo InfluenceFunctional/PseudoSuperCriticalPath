@@ -36,7 +36,12 @@ def compose_row_function(log_file: str, minimization: bool) -> Callable[[int], b
             continue
         ranges.append([start, end])
     # Include header.
-    ranges[0][0] -= 1
+    if ranges == []:
+        raise ValueError("No valid rows found")
+        print("Invalid screen.log file")
+    else:
+        ranges[0][0] -= 1
+
     # Remove overlaps.
     for i in range(1, len(ranges)):
         ranges[1][0] += 1
