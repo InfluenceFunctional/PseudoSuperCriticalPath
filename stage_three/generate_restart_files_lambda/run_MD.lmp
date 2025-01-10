@@ -1,7 +1,7 @@
   variable          T_sample      equal 400    # Temperature
   variable          t_run  equal 2000000     # number of MD steps
   variable          t_print equal ${t_run}/200  #how often to print histogram
-  variable          t_restart equal 20000
+  variable          t_restart equal 2000
 
   variable eta_lj equal 0.1
   variable eta_c equal 0.1

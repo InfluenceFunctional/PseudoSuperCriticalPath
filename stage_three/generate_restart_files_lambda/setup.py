@@ -143,7 +143,7 @@ def main():
     slurm_file = "sub_job.slurm"
 
     number_steps = 2000000
-    number_restart_steps = 20000  # 100 restart files
+    number_restart_steps = number_steps//1000  # 1000 restart files
 
     copy(old_data_file, f"cluster_stage_two_generate.data")
     copy(init_settings, f"new_system.in.init")
