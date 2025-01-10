@@ -67,7 +67,7 @@ def main():
                     raise e
 
             intra_energy = data['E_mol'].to_numpy() * unit.kilocalorie_per_mole
-            coul_energy = (data['c_coul'] + data['E_long']).to_numpy() * unit.kilocalorie_per_mole
+            coul_energy = (data['c_coul'] + data['E_long']/data['v_scale_coulomb']).to_numpy() * unit.kilocalorie_per_mole
             gauss_energy = data['c_gauss'].to_numpy() * unit.kilocalorie_per_mole
             lj_energy = data['c_lj'].to_numpy() * unit.kilocalorie_per_mole
             scale_series[ind, :] = [data['v_scale_coulomb'][0], data['v_scale_lj'][0], data['v_scale_gauss'][0], lmbd]
