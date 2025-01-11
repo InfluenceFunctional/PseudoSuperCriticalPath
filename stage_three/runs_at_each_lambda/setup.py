@@ -1,15 +1,26 @@
 import os
 from shutil import copy
 
+from analyze_stage_three_generation_run import extract_lambda_spacing
+
 
 def main():
     reference_temperature = 400
 
     number_steps = 2000000
-    number_restart_steps = 20000  # 100 restart files
+    number_restart_steps = 2000  # 100 restart files
+    gen_path = '../generate_restart_files_lambda'
+    restart_paths = os.listdir(gen_path)
+    restart_paths = [p for p in restart_paths if 'stage_three.restart' in p]
 
-    for i in range(1, number_steps // number_restart_steps + 1):
-        current_restart_step = i * number_restart_steps
+    steps_to_restart = extract_lambda_spacing(100,
+                                              len(restart_paths),
+                                              gen_path,
+                                              buffer=10,
+                                              )
+
+    for i in range(len(steps_to_restart)):
+        current_restart_step = steps_to_restart[i]
         current_lambda = current_restart_step / number_steps
         current_lambda_str = str(current_lambda)
 

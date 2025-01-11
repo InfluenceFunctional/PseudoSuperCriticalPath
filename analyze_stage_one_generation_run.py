@@ -47,54 +47,41 @@ def plot_run_thermo(lmbd):
 
 
 def analyze_gen_runs():
-    run_directory = Path(r'D:\crystal_datasets\pscp\stage_three\generate_restart_files_lambda')
-    log_file = run_directory.joinpath("screen.log")
-    data = pd.read_csv(log_file, skiprows=compose_row_function(log_file, False), sep=r"\s+")
+    head_directory = Path(r'D:\crystal_datasets\pscp\stage_one_fixed\generate_restart_files_lambda')
+    for dir in ['well_width_0.09', 'well_width_0.9','well_width_4.0']:
+        run_directory = head_directory.joinpath(Path(dir))
+        log_file = run_directory.joinpath("screen.log")
+        data = pd.read_csv(log_file, skiprows=compose_row_function(log_file, False), sep=r"\s+")
 
-    from plotly.subplots import make_subplots
+        from plotly.subplots import make_subplots
 
-    rows = 2
-    cols = 5
-    keys_to_plot = ['E_pair', 'Volume', 'Temp', 'Press', 'KinEng', 'PotEng', 'TotEng', 'E_mol', 'E_pair_grad',
-                    'P_grad']
-    data['E_pair_grad'] = np.gradient(data['E_pair'])
-    data['P_grad'] = np.gradient(data['Press'])
-    fig = make_subplots(rows=rows, cols=cols, subplot_titles=keys_to_plot)
+        rows = 2
+        cols = 5
+        keys_to_plot = ['E_pair', 'Volume', 'Temp', 'Press', 'KinEng', 'PotEng', 'TotEng', 'E_mol', 'E_pair_grad',
+                        'P_grad']
+        data['E_pair_grad'] = np.gradient(data['E_pair'])
+        data['P_grad'] = np.gradient(data['Press'])
+        fig = make_subplots(rows=rows, cols=cols, subplot_titles=keys_to_plot)
 
-    for ind, k1 in enumerate(keys_to_plot):
-        row = ind // cols + 1
-        col = ind % cols + 1
-        fig.add_scatter(x=data['Time'], y=data[k1], showlegend=False, row=row, col=col)
+        for ind, k1 in enumerate(keys_to_plot):
+            row = ind // cols + 1
+            col = ind % cols + 1
+            fig.add_scatter(x=data['Time'], y=data[k1], showlegend=False, row=row, col=col)
 
-    #fig.show(renderer='browser')
+        #fig.show(renderer='browser')
 
-    '''
-    try to predict local overlaps
-    '''
+        '''
+        try to predict local overlaps
+        '''
 
-    energy = data['PotEng']
+        energy = data['PotEng']
 
-    num_lambda_steps = 100
-    #lambda_steps = optimize_lambda_spacing3(np.array(energy), num_lambda_steps=num_lambda_steps, buffer=50, maxiter=200)
-    lambda_steps = optimize_lambda_spacing(np.array(energy[::10]), num_lambda_steps=num_lambda_steps, buffer=10,
-                                           maxiter=1000)
-
-
-def extract_lambda_spacing(num_lambda_steps, num_restart_paths, gen_restart_path: str, buffer=10):
-    run_directory = Path(gen_restart_path)
-    log_file = run_directory.joinpath("screen.log")
-    data = pd.read_csv(log_file, skiprows=compose_row_function(log_file, False), sep=r"\s+")
-    energy = data['PotEng']
-
-    subsample_ratio = len(energy) // num_restart_paths
-
-    lambda_steps = optimize_lambda_spacing(np.array(energy)[::subsample_ratio],
-                                           num_lambda_steps=num_lambda_steps,
-                                           buffer=buffer,
-                                           maxiter=1000,
-                                           showfigs=False)
-
-    return lambda_steps
+        num_lambda_steps = 100
+        #lambda_steps = optimize_lambda_spacing3(np.array(energy), num_lambda_steps=num_lambda_steps, buffer=50, maxiter=200)
+        lambda_steps = optimize_lambda_spacing(np.array(energy[::10]),
+                                               num_lambda_steps=num_lambda_steps,
+                                               buffer=10,
+                                               maxiter=1000)
 
 
 def spacing_analysis_fig(data, energy, lambda_steps, lambdas, buffer):
@@ -126,7 +113,7 @@ def spacing_analysis_fig(data, energy, lambda_steps, lambdas, buffer):
     fig.show(renderer='browser')
 
 
-def optimize_lambda_spacing(energy, num_lambda_steps, buffer, maxiter=200, showfigs=True):
+def optimize_lambda_spacing(energy, num_lambda_steps, buffer, maxiter=200):
     all_steps = np.arange(0, len(energy))
     lambda_energies, lambda_widths, full_nn_overlaps, full_overlaps = batch_compute_overlaps(buffer, energy, all_steps)
 
@@ -181,13 +168,12 @@ def optimize_lambda_spacing(energy, num_lambda_steps, buffer, maxiter=200, showf
 
     min_record = np.array([ov.min() for ov in overlaps_record])
     mean_record = np.array([ov.mean() for ov in overlaps_record])
-    if showfigs:
-        import plotly.graph_objects as go
-        fig = go.Figure()
-        fig.add_scatter(y=min_record, name='min')
-        fig.add_scatter(y=mean_record, name='mean')
-        fig.show(renderer='browser')
-        go.Figure(go.Scatter(y=min_record * mean_record, name='combo score')).show(renderer='browser')
+    import plotly.graph_objects as go
+    fig = go.Figure()
+    fig.add_scatter(y=min_record, name='min')
+    fig.add_scatter(y=mean_record, name='mean')
+    fig.show(renderer='browser')
+    go.Figure(go.Scatter(y=min_record * mean_record, name='combo score')).show(renderer='browser')
 
     best_greedy_state = np.asarray(states_record[np.argmax(min_record)])
     mins = []
@@ -204,18 +190,16 @@ def optimize_lambda_spacing(energy, num_lambda_steps, buffer, maxiter=200, showf
 
     best_state = exp_states[np.argmax(np.array(mins))]
 
-    if showfigs:
-        run_directory = Path(r'D:\crystal_datasets\pscp\stage_three\generate_restart_files_lambda')
-        log_file = run_directory.joinpath("screen.log")
-        data = pd.read_csv(log_file, skiprows=compose_row_function(log_file, False), sep=r"\s+")
+    run_directory = Path(r'D:\crystal_datasets\pscp\stage_three\generate_restart_files_lambda')
+    log_file = run_directory.joinpath("screen.log")
+    data = pd.read_csv(log_file, skiprows=compose_row_function(log_file, False), sep=r"\s+")
 
-        lambdas = np.linspace(0, 1, len(energy))
-        spacing_analysis_fig(data, energy, best_state, lambdas, buffer=buffer)
+    lambdas = np.linspace(0, 1, len(energy))
+    spacing_analysis_fig(data, energy, best_state, lambdas, buffer=buffer)
 
-        fig = go.Figure(
-            go.Scatter(x=np.linspace(0, 1, len(best_state)), y=best_state / best_state[-1], mode='lines+markers'))
-        fig.add_scatter(x=np.linspace(0, 1, len(best_state)), y=np.linspace(0, 1, len(best_state))).show(
-            renderer='browser')
+    fig = go.Figure(
+        go.Scatter(x=np.linspace(0, 1, len(best_state)), y=best_state / best_state[-1], mode='lines+markers'))
+    fig.add_scatter(x=np.linspace(0, 1, len(best_state)), y=np.linspace(0, 1, len(best_state))).show(renderer='browser')
 
     return best_state
 

@@ -21,7 +21,7 @@ def main():
     # lambda_step = 0.01
     # lambdas = np.linspace(lambda_step, 1, int(1/lambda_step))
     lmax = 1
-    well_width = "0.09"
+    well_width = "0.9"
     mbar_init = "BAR"  # "BAR" "zeros"
     num_samples_list = [50]
     directory = Path("stage_one_fixed/runs_at_each_lambda/well_width_" + well_width)
