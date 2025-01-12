@@ -27,40 +27,41 @@ def main():
 
     for i in range(len(steps_to_restart)):
         current_restart_step = steps_to_restart[i]
-        current_lambda = restart_steps[current_restart_step]
-        current_lambda_str = str(current_lambda)
+        current_lambda = float(current_restart_step / 1000)
+        restart_step = restart_steps[current_restart_step]
+        restart_step_string = str(restart_step)
 
         try:
-            os.mkdir(f"lambda_{current_lambda_str}")
+            os.mkdir(f"lambda_{restart_step_string}")
         except FileExistsError:
             pass
 
-        copy(f"../generate_restart_files_lambda//stage_three.restart.{current_lambda_str}",
-             f"lambda_{current_lambda_str}/")
+        copy(f"../generate_restart_files_lambda//stage_three.restart.{restart_step_string}",
+             f"lambda_{restart_step_string}/")
 
         copy(f"../generate_restart_files_lambda//system.in.settings.hybrid_overlay",
-             f"lambda_{current_lambda_str}/")
+             f"lambda_{restart_step_string}/")
 
         with (open(f"../generate_restart_files_lambda//create_atoms.txt", "r") as read,
-              open(f"lambda_{current_lambda_str}/coeffs.txt", "w") as write):
+              open(f"lambda_{restart_step_string}/coeffs.txt", "w") as write):
             for line in read:
                 if line.startswith("mass") or line.startswith("create_atoms"):
                     continue
                 write.write(line)
 
         with (open("run_MD.lmp", "r") as read,
-              open(f"lambda_{current_lambda_str}/run_MD.lmp", "w") as write):
+              open(f"lambda_{restart_step_string}/run_MD.lmp", "w") as write):
             text = read.read()
             text = text.replace("_T_SAMPLE", str(reference_temperature))
             text = text.replace("_N_STEPS", str(number_steps))
             text = text.replace("_LAMBDA", str(current_lambda))
-            text = text.replace("_RESTART_FILE", f"stage_three.restart.{current_lambda_str}")
+            text = text.replace("_RESTART_FILE", f"stage_three.restart.{restart_step_string}")
             write.write(text)
 
-        copy("sub_job.slurm", f"lambda_{current_lambda_str}/sub_job.slurm")
+        copy("sub_job.slurm", f"lambda_{restart_step_string}/sub_job.slurm")
 
         d = os.getcwd()
-        os.chdir(f"lambda_{current_lambda_str}")
+        os.chdir(f"lambda_{restart_step_string}")
         os.system("sbatch sub_job.slurm")
         os.chdir(d)
 
