@@ -1,6 +1,8 @@
 import os
 from shutil import copy
 
+import numpy as np
+
 from analyze_stage_three_generation_run import extract_lambda_spacing
 
 
@@ -19,10 +21,13 @@ def main():
                                               buffer=10,
                                               )
     steps_to_restart[0] = 1
+    steps_to_restart[-1] = 999
+    print(f"running at lambda points {steps_to_restart}")
+    restart_steps = np.linspace(number_steps // 1000, number_steps, 1000).astype(int)
 
     for i in range(len(steps_to_restart)):
         current_restart_step = steps_to_restart[i]
-        current_lambda = current_restart_step / number_steps
+        current_lambda = restart_steps[current_restart_step]
         current_lambda_str = str(current_lambda)
 
         try:
