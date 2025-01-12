@@ -18,6 +18,7 @@ def main():
                                               gen_path,
                                               buffer=10,
                                               )
+    steps_to_restart[0] = 1
 
     for i in range(len(steps_to_restart)):
         current_restart_step = steps_to_restart[i]
