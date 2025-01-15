@@ -194,7 +194,7 @@ def main():
                 text = text.replace("_STEPS_RESTART", str(number_restart_steps))
                 write.write(text)
 
-            copy(slurm_file, run_name.joinpath(Path("sub_job.slurm"))
+            copy(slurm_file, run_name.joinpath(Path("sub_job.slurm")))
 
             d = os.getcwd()
             os.chdir(f"well_width_{well_width}")
