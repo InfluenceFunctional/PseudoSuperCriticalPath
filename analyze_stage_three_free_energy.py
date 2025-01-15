@@ -24,12 +24,12 @@ def main():
     # lambdas = np.linspace(lambda_step, 1, int(1/lambda_step))
     lmax = 1
     mbar_init = "BAR"  # "BAR" "zeros"
-    num_samples_list = [50]
-    directory = Path("stage_three/reruns_at_each_lambda")
+    num_samples_list = [1000]
+    directory = Path("stage_three/runs_at_each_lambda")
 
     lambda_dirs = os.listdir(directory)
     lambda_dirs = [dir for dir in lambda_dirs if "lambda_" in dir]
-    lambdas = np.sort([float(dir.split('_')[-1]) for dir in lambda_dirs])
+    lambda_steps = np.sort([float(dir.split('_')[-1]) for dir in lambda_dirs]).astype(int)
 
     temperature = 400  # kelvin
     pressure = 1.0  # atm
@@ -48,11 +48,9 @@ def main():
         lj_series = np.empty(0)
         gauss_series = np.empty(0)
         n_k = np.empty(0, dtype=int)
-        scale_series = np.zeros((len(lambdas), 4))
-        for ind, lmbd in enumerate(tqdm(lambdas)):
-            run_directory = Path(f"{directory}/lambda_{lmbd:.2g}")
-            if lmbd == 1:
-                run_directory = Path(f"{directory}/lambda_{lmbd:.2g}.0")
+        scale_series = np.zeros((len(lambda_steps), 4))
+        for ind, lmbd in enumerate(tqdm(lambda_steps)):
+            run_directory = Path(f"{directory}/lambda_{lmbd}")
             assert (np.loadtxt(run_directory.joinpath("tmp.out"), skiprows=3, max_rows=1, dtype=int)[1]
                     == number_molecules)
             log_file = run_directory.joinpath("screen.log")
@@ -61,14 +59,14 @@ def main():
                 data = pd.read_csv(log_file, skiprows=compose_row_function(log_file, False), sep=r"\s+")
             except ValueError as e:
                 if str(e) == "No valid rows found":
-                    lambdas = lambdas[lambdas != lmbd]
+                    lambda_steps = lambda_steps[lambda_steps != lmbd]
                     print(str(e))
                     continue
                 else:
                     raise e
 
             intra_energy = data['E_mol'].to_numpy() * unit.kilocalorie_per_mole
-            coul_energy = (data['c_coul'] + data['E_long']).to_numpy() * unit.kilocalorie_per_mole
+            coul_energy = (data['c_coul'] + data['E_long']/data['v_scale_coulomb']).to_numpy() * unit.kilocalorie_per_mole
             gauss_energy = data['c_gauss'].to_numpy() * unit.kilocalorie_per_mole
             lj_energy = data['c_lj'].to_numpy() * unit.kilocalorie_per_mole
             scale_series[ind, :] = [data['v_scale_coulomb'][0], data['v_scale_lj'][0], data['v_scale_gauss'][0], lmbd]
@@ -96,7 +94,9 @@ def main():
         assert len(coul_series) == np.sum(n_k)
         print("Finished reading timeseries.")
 
-    lambdas = scale_series[:, 3]
+    lambda_steps = scale_series[:, 3]
+    # convert from lambda steps to lambdas
+    lambdas = lambda_steps / lambda_steps[-1]
     lambdas = lambdas[lambdas <= lmax]
 
     c_ens = np.zeros(len(lambdas))
@@ -165,23 +165,23 @@ def main():
     fig = go.Figure(go.Scatter(x=lambdas, y=means, mode='lines+markers', error_y=dict(type='data', array=stds**2, visible=True))).show(renderer='browser')
 
     import plotly.graph_objects as go
-
-    fig = go.Figure()
-    batch = np.repeat(np.arange(len(lambdas)), n_k, axis=0)
-    overlap = np.zeros(len(lambdas) - 1)
-    for ind in range(len(lambdas) - 1):
-        h1, b1 = np.histogram(ukn[ind, batch == ind], bins=50, density=True)
-        h2, _ = np.histogram(ukn[ind + 1, batch == ind + 1], bins=50, density=True, range=[b1[0], b1[-1]])
-
-        h3, b1 = np.histogram(ukn[ind + 1, batch == ind + 1], bins=50, density=True)
-        h4, _ = np.histogram(ukn[ind, batch == ind], bins=50, density=True, range=[b1[0], b1[-1]])
-        overlap[ind] = (np.nan_to_num(np.sum(np.minimum(h1, h2))) + np.nan_to_num(np.sum(np.minimum(h3, h4)))) / 2
-
-    fig.add_scatter(x=lambdas, y=overlap, name="Nearest-Neighbor Overlap")
-    fig.add_scatter(x=lambdas, y=np.diff(scale_series[:, 0]), name='Coul Slope')
-    fig.add_scatter(x=lambdas, y=np.diff(scale_series[:, 1]), name='LJ Slope')
-    fig.add_scatter(x=lambdas, y=np.diff(scale_series[:, 2]), name='Gauss Slope')
-    fig.show()
+    #
+    # fig = go.Figure()
+    # batch = np.repeat(np.arange(len(lambdas)), n_k, axis=0)
+    # overlap = np.zeros(len(lambdas) - 1)
+    # for ind in range(len(lambdas) - 1):
+    #     h1, b1 = np.histogram(ukn[ind, batch == ind], bins=50, density=True)
+    #     h2, _ = np.histogram(ukn[ind + 1, batch == ind + 1], bins=50, density=True, range=[b1[0], b1[-1]])
+    #
+    #     h3, b1 = np.histogram(ukn[ind + 1, batch == ind + 1], bins=50, density=True)
+    #     h4, _ = np.histogram(ukn[ind, batch == ind], bins=50, density=True, range=[b1[0], b1[-1]])
+    #     overlap[ind] = (np.nan_to_num(np.sum(np.minimum(h1, h2))) + np.nan_to_num(np.sum(np.minimum(h3, h4)))) / 2
+    #
+    # fig.add_scatter(x=lambdas, y=overlap, name="Nearest-Neighbor Overlap")
+    # fig.add_scatter(x=lambdas, y=np.diff(scale_series[:, 0]), name='Coul Slope')
+    # fig.add_scatter(x=lambdas, y=np.diff(scale_series[:, 1]), name='LJ Slope')
+    # fig.add_scatter(x=lambdas, y=np.diff(scale_series[:, 2]), name='Gauss Slope')
+    # fig.show()
 
     # subsample ukns
     for max_samples in num_samples_list:
@@ -199,34 +199,13 @@ def main():
 
         mbar = pymbar.MBAR(new_ukn, new_nk, initialize=mbar_init)
         result = mbar.compute_free_energy_differences()
-        # plt.errorbar(lambdas, result["Delta_f"][0, :] / number_molecules,
-        #              yerr=result["dDelta_f"][0, :] / number_molecules, label=directory,
-        #              )
-        # #color=f"C{directory_index}")
-        # # entropy = -np.gradient(result["Delta_f"][0, :], np.diff(lambdas)[0])
-        # # heat_capacity = lambdas * np.gradient(entropy, np.diff(lambdas)[0])
-        # # plt.plot(lambdas, -np.gradient(result["Delta_f"][0, :], np.diff(lambdas)[0]),
-        # #          #color=f"C{directory_index}",
-        # #          linestyle="--")
-        # # plt.plot(lambdas, heat_capacity,
-        # #          #color=f"C{directory_index}",
-        # #          linestyle=":")
-        #
-        # # read in stage 1 screen.log and implement eqn 7 with explicit rescaling
-        # # then mbar matrix in lambda x timeseries
-        # # stage 2 will be equation 17
-        #
-        # plt.xlabel("Lambda")
-        # plt.ylabel("Dimensionless free energy difference per molecule")
-        # plt.legend()
-        # plt.savefig(f"stage_one_{max_samples}_{well_width}.pdf", bbox_inches="tight")
-        # plt.close()
 
         # opt plot overlap matrix
         import plotly.graph_objects as go
         from plotly.subplots import make_subplots
         overlap = mbar.compute_overlap()
-        fig = make_subplots(rows=1, cols=3)
+        nn_overlap = np.array([overlap['matrix'][i, i+1] for i in range(len(overlap['matrix'])-1)])
+        fig = make_subplots(rows=1, cols=4)
         fig.add_scatter(x=lambdas, y=result['Delta_f'][0, :] / number_molecules,
                         error_y=dict(type='data', array=[result['dDelta_f'][0, :] / number_molecules], visible=True),
                         showlegend=False,
@@ -240,6 +219,7 @@ def main():
         fig.add_scatter(x=lambdas, y=scale_series[:, 0], name='Coul Scale', row=1, col=3)
         fig.add_scatter(x=lambdas, y=scale_series[:, 1], name='LJ Scale', row=1, col=3)
         fig.add_scatter(x=lambdas, y=scale_series[:, 2], name='Gauss Scale', row=1, col=3)
+        fig.add_scatter(x=lambdas[1:], y=nn_overlap, name="Nearest-Neighbor overlap", row=1, col=4)
         fig.update_layout(xaxis1_title='Lambda', yaxis1_title='Free Energy Difference',
                           xaxis2_title='Lambda', yaxis2_title='Lambda',
                           xaxis3_title='Lambda', yaxis3_title='Scaling Factor')
@@ -253,7 +233,7 @@ def main():
         :param lmbd:
         :return:
         """
-        directory = Path("stage_one_fixed/runs_at_each_lambda/")
+        directory = Path("stage_three/runs_at_each_lambda/")
 
         lambda_dirs = os.listdir(directory)
         lambda_dirs = [dir for dir in lambda_dirs if "lambda_" in dir]

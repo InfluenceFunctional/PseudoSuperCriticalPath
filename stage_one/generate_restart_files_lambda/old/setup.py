@@ -1,6 +1,4 @@
 from itertools import chain
-from pathlib import Path
-
 import MDAnalysis
 import os
 from shutil import copy
@@ -95,9 +93,7 @@ def find_hydrogen_type(topology_file: str) -> int:
 
 
 def generate_create_atoms(filename: str, mean_positions_file: str, hydrogen_type: int,
-                          well_width_angstrom_squared: float,
-                          well_depth: float,
-                          kappa_file: str) -> int:
+                          well_width_angstrom_squared: float, kappa_file: str) -> int:
     universe = MDAnalysis.Universe(mean_positions_file, in_memory=True, format="XYZ")
     old_types = set(int(atom.type) for atom in universe.atoms)
     max_type = max(old_types)
@@ -116,6 +112,7 @@ def generate_create_atoms(filename: str, mean_positions_file: str, hydrogen_type
             _ = float(split_line[3])
             kappa_values[int(split_line[0])] = float(split_line[2])
     print(kappa_values)
+
 
     with open(filename, "w") as write_file:
         for new_type in new_types:
@@ -139,8 +136,7 @@ def generate_create_atoms(filename: str, mean_positions_file: str, hydrogen_type
         for old_type in old_types:
             if old_type != hydrogen_type:
                 print(f"pair_coeff {old_type} {old_type + max_type} gauss "
-                      #f"{kappa_values[old_type] / well_width_angstrom_squared} {well_width_angstrom_squared}",
-                      f"{well_depth} {well_width_angstrom_squared}",
+                      f"{kappa_values[old_type] / well_width_angstrom_squared} {well_width_angstrom_squared}",
                       file=write_file)
 
         print("", file=write_file)
@@ -165,41 +161,40 @@ def main():
     new_settings = "system.in.settings.hybrid_overlay"
     new_atoms = "create_atoms.txt"
     # 4.0 estimated from Mathematica script, 0.9 used by them, 0.09 reported in the paper.
-    well_widths_angstrom_squared = [0.1, 0.5, 1.0, 2.0, 4.0]
-    well_depths = [0.1, 0.5, 1.0, 2.0, 4.0]
+    well_widths_angstrom_squared = [4.0, 0.9, 0.09]
     kappa_file = f"{solid_directory}/analysis/kappa.txt"
 
     number_steps = 2000000
-    number_restart_steps = 2000  # 1000 restart files
+    number_restart_steps = 20000  # 100 restart files
+
 
     for well_width in well_widths_angstrom_squared:
-        for well_depth in well_depths:
-            run_name = Path(f"well_width_{well_width}_well_depth_{well_depth}")
-            try:
-                os.mkdir(run_name)
-            except FileExistsError:
-                pass
+        try:
+            os.mkdir(f"well_width_{well_width}")
+        except FileExistsError:
+            pass
 
-            copy(old_data_file, run_name.joinpath(Path("cluster_equi_nvt.data")))
-            copy(init_settings, run_name.joinpath(Path("/new_system.in.init")))
-            generate_system_settings_file(run_name.joinpath(Path(new_settings)), old_settings, init_settings)
-            number_new_types = generate_create_atoms(run_name.joinpath(Path(new_atoms)), nvt_mean_positions,
-                                                     find_hydrogen_type(topology_file), well_width, well_depth, kappa_file)
+        copy(old_data_file, f"well_width_{well_width}/cluster_equi_nvt.data")
+        copy(init_settings, f"well_width_{well_width}/new_system.in.init")
+        generate_system_settings_file(f"well_width_{well_width}/{new_settings}", old_settings,
+                                      init_settings)
+        number_new_types = generate_create_atoms(f"well_width_{well_width}/{new_atoms}", nvt_mean_positions,
+                                                 find_hydrogen_type(topology_file), well_width, kappa_file)
 
-            with open("run_MD.lmp", "r") as read, open(run_name.joinpath(Path("run_MD.lmp")), "w") as write:
-                text = read.read()
-                text = text.replace("_T_SAMPLE", str(reference_temperature))
-                text = text.replace("_N_STEPS", str(number_steps))
-                text = text.replace("_N_NEW_TYPES", str(number_new_types))
-                text = text.replace("_STEPS_RESTART", str(number_restart_steps))
-                write.write(text)
+        with open("run_MD.lmp", "r") as read, open(f"well_width_{well_width}/run_MD.lmp", "w") as write:
+            text = read.read()
+            text = text.replace("_T_SAMPLE", str(reference_temperature))
+            text = text.replace("_N_STEPS", str(number_steps))
+            text = text.replace("_N_NEW_TYPES", str(number_new_types))
+            text = text.replace("_STEPS_RESTART", str(number_restart_steps))
+            write.write(text)
 
-            copy(slurm_file, run_name.joinpath(Path("sub_job.slurm"))
+        copy(slurm_file, f"well_width_{well_width}/sub_job.slurm")
 
-            d = os.getcwd()
-            os.chdir(f"well_width_{well_width}")
-            os.system("sbatch sub_job.slurm")
-            os.chdir(d)
+        d = os.getcwd()
+        os.chdir(f"well_width_{well_width}")
+        os.system("sbatch sub_job.slurm")
+        os.chdir(d)
 
 
 if __name__ == '__main__':
