@@ -181,7 +181,7 @@ def main():
                 pass
 
             copy(old_data_file, run_name.joinpath(Path("cluster_equi_nvt.data")))
-            copy(init_settings, run_name.joinpath(Path("/new_system.in.init")))
+            copy(init_settings, run_name.joinpath(Path("new_system.in.init")))
             generate_system_settings_file(run_name.joinpath(Path(new_settings)), old_settings, init_settings)
             number_new_types = generate_create_atoms(run_name.joinpath(Path(new_atoms)), nvt_mean_positions,
                                                      find_hydrogen_type(topology_file), well_width, well_depth, kappa_file)
