@@ -175,10 +175,12 @@ def main():
     for well_width in well_widths_angstrom_squared:
         for well_depth in well_depths:
             run_name = Path(f"well_width_{well_width}_well_depth_{well_depth}")
-            try:
-                os.mkdir(run_name)
-            except FileExistsError:
-                pass
+            if os.path.exists(run_name):
+                print(f'{run_name} already exists!')
+                continue
+
+            print(f'making run {run_name}')
+            os.mkdir(run_name)
 
             copy(old_data_file, run_name.joinpath(Path("cluster_equi_nvt.data")))
             copy(init_settings, run_name.joinpath(Path("new_system.in.init")))
