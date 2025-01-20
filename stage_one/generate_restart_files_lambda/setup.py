@@ -165,7 +165,7 @@ def main():
     new_settings = "system.in.settings.hybrid_overlay"
     new_atoms = "create_atoms.txt"
     # 4.0 estimated from Mathematica script, 0.9 used by them, 0.09 reported in the paper.
-    well_widths_angstrom_squared = [0.1, 0.5, 1.0, 2.0, 4.0]
+    well_widths_angstrom_squared = [0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 4.0]
     well_depths = [0.1, 0.5, 1.0, 2.0, 4.0]
     kappa_file = f"{solid_directory}/analysis/kappa.txt"
 

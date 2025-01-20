@@ -9,11 +9,12 @@ import MDAnalysis.analysis.rdf as rdf
 from ovito import io
 from ovito.modifiers import DeleteSelectedModifier, SelectTypeModifier
 
-runs_dir = Path(r'D:\crystal_datasets\pscp\stage_one_fixed\runs_at_each_lambda\well_width_4.0')
-runs_to_analyze = ['lambda_0.69', 'lambda_0.7', 'lambda_0.71']
+runs_dir = Path(r'D:\crystal_datasets\pscp\stage_one\generate_restart_files_lambda')
+dirs = os.listdir(runs_dir)
+runs_to_analyze = [run for run in dirs if 'well_width_' in run]
 number_of_ignored_frames = 10
 
-for run_dir in runs_to_analyze:
+for run_dir in runs_to_analyze[:2]:
     trajectory = runs_dir.joinpath(run_dir + '/traj.dump')
     topology = "D:\crystal_datasets\pscp\stage_one_fixed\generate_restart_files_lambda\well_width_4.0\cluster_stage_one_generate.data"
     pipeline = io.import_file(trajectory)
@@ -45,3 +46,5 @@ for run_dir in runs_to_analyze:
     fig = go.Figure()
     fig.add_scatter(x=r1.results.bins, y=r1.results.rdf)
     fig.show(renderer='browser')
+
+    aa = 1

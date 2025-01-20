@@ -1,10 +1,12 @@
 import os
 from pathlib import Path
 
+import plotly.graph_objects as go
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from plotly.subplots import make_subplots
+from scipy.ndimage import gaussian_filter1d
 
 from analyze import compose_row_function
 
@@ -46,42 +48,86 @@ def plot_run_thermo(lmbd):
     fig.show()
 
 
-def analyze_gen_runs():
-    head_directory = Path(r'D:\crystal_datasets\pscp\stage_one_fixed\generate_restart_files_lambda')
-    for dir in ['well_width_0.09', 'well_width_0.9','well_width_4.0']:
+def analyze_gen_runs(show_figs=False):
+    head_directory = Path(r'D:\crystal_datasets\pscp\stage_one\generate_restart_files_lambda')
+    os.chdir(head_directory)
+    dirs = os.listdir()
+    dirs = [dir for dir in dirs if 'well_width' in dir]
+    en_records = []
+    for dir in dirs:
         run_directory = head_directory.joinpath(Path(dir))
         log_file = run_directory.joinpath("screen.log")
         data = pd.read_csv(log_file, skiprows=compose_row_function(log_file, False), sep=r"\s+")
-
-        from plotly.subplots import make_subplots
-
-        rows = 2
-        cols = 5
-        keys_to_plot = ['E_pair', 'Volume', 'Temp', 'Press', 'KinEng', 'PotEng', 'TotEng', 'E_mol', 'E_pair_grad',
-                        'P_grad']
         data['E_pair_grad'] = np.gradient(data['E_pair'])
         data['P_grad'] = np.gradient(data['Press'])
-        fig = make_subplots(rows=rows, cols=cols, subplot_titles=keys_to_plot)
+        en_records.append(data['E_pair'])
 
-        for ind, k1 in enumerate(keys_to_plot):
-            row = ind // cols + 1
-            col = ind % cols + 1
-            fig.add_scatter(x=data['Time'], y=data[k1], showlegend=False, row=row, col=col)
+        if show_figs:
+            make_run_thermo_fig(data, dir)
 
-        #fig.show(renderer='browser')
+    # extract the run with the smoothest transition
+    en_records = np.vstack(en_records)
 
-        '''
-        try to predict local overlaps
-        '''
+    sigma = 100
+    normed_ens = en_records / np.abs(np.mean(en_records, axis=1))[:, None]
+    smoothed_ens = gaussian_filter1d(normed_ens, sigma=sigma)
+    diffs = np.diff(smoothed_ens,axis=1)
+    grads = np.diff(diffs, axis=1)
 
-        energy = data['PotEng']
+    fig = make_subplots(rows=1, cols=3, subplot_titles=['Energy', '1st deriv', '2nd deriv'])
+    for ind in range(len(en_records)):
+        fig.add_scatter(y=en_records[ind]/np.abs(en_records[ind].mean()), row=1,col=1, name=dirs[ind], legendgroup=dirs[ind], showlegend=True)
+        fig.add_scatter(y=diffs[ind], row=1,col=2, name=dirs[ind], legendgroup=dirs[ind], showlegend=False)
+        fig.add_scatter(y=grads[ind], row=1,col=3, name=dirs[ind], legendgroup=dirs[ind], showlegend=False)
+    fig.show(renderer='browser')
 
-        num_lambda_steps = 100
-        #lambda_steps = optimize_lambda_spacing3(np.array(energy), num_lambda_steps=num_lambda_steps, buffer=50, maxiter=200)
-        lambda_steps = optimize_lambda_spacing(np.array(energy[::10]),
-                                               num_lambda_steps=num_lambda_steps,
-                                               buffer=10,
-                                               maxiter=1000)
+    well_width = [0.1, 0.5, 1.0, 2.0, 4.0]
+    well_depth = [0.1, 0.5, 1.0, 2.0, 4.0]
+    max_grad = np.max(np.abs(grads),axis=1)
+
+    fig = go.Figure()
+    fig.add_heatmap(x=well_depth, y=well_width, z=max_grad.reshape(len(well_width), len(well_depth)))
+    fig.update_layout(xaxis_title='well_depth', yaxis_title='well_width')
+    fig.show(renderer='browser')
+
+    smoothest_run_ind = np.argmin(max_grad)
+    dir = dirs[smoothest_run_ind]
+    run_directory = head_directory.joinpath(Path(dir))
+    log_file = run_directory.joinpath("screen.log")
+    data = pd.read_csv(log_file, skiprows=compose_row_function(log_file, False), sep=r"\s+")
+    data['E_pair_grad'] = np.gradient(data['E_pair'])
+    data['P_grad'] = np.gradient(data['Press'])
+    make_run_thermo_fig(data, dir, sigma)
+
+    aa = 1
+
+    '''
+    try to predict local overlaps
+    '''
+
+    # energy = data['PotEng']
+    #
+    # num_lambda_steps = 100
+    # #lambda_steps = optimize_lambda_spacing3(np.array(energy), num_lambda_steps=num_lambda_steps, buffer=50, maxiter=200)
+    # lambda_steps = optimize_lambda_spacing(np.array(energy[::10]),
+    #                                        num_lambda_steps=num_lambda_steps,
+    #                                        buffer=10,
+    #                                        maxiter=1000)
+
+
+def make_run_thermo_fig(data, dir, sigma=0.01):
+    from plotly.subplots import make_subplots
+    rows = 2
+    cols = 5
+    keys_to_plot = ['E_pair', 'Volume', 'Temp', 'Press', 'KinEng', 'PotEng', 'TotEng', 'E_mol', 'E_pair_grad',
+                    'P_grad']
+    fig = make_subplots(rows=rows, cols=cols, subplot_titles=keys_to_plot)
+    for ind, k1 in enumerate(keys_to_plot):
+        row = ind // cols + 1
+        col = ind % cols + 1
+        fig.add_scatter(x=data['Time'], y=gaussian_filter1d(data[k1], sigma), showlegend=False, row=row, col=col)
+    fig.update_layout(title=dir)
+    fig.show(renderer='browser')
 
 
 def spacing_analysis_fig(data, energy, lambda_steps, lambdas, buffer):
