@@ -3,7 +3,7 @@ from shutil import copy
 
 import numpy as np
 
-from analyze_stage_one_generation_run import extract_lambda_spacing
+from analyze_stage_three_generation_run import extract_lambda_spacing
 
 
 def main():
