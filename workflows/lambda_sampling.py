@@ -82,7 +82,7 @@ def lambda_runs(run_type: str,
             text = text.replace("_T_SAMPLE", str(reference_temperature))
             text = text.replace("_N_STEPS", str(restart_sampling_time))
             text = text.replace("_LAMBDA", str(current_lambda))
-            text = text.replace("_RESTART_FILE", f"stage_one.restart.{restart_step_string}")
+            text = text.replace("_RESTART_FILE", f"{run_type}.restart.{restart_step_string}")
             if run_type == 'stage_two':
                 text = text.replace("_STEPS_RESTART", str(restart_time))
 
