@@ -1,0 +1,119 @@
+import subprocess
+from pathlib import Path
+import os
+from shutil import copy
+
+import numpy as np
+
+
+
+template = '''
+variable        xv equal v_a
+variable        xyv equal v_b*cos(v_gamma*PI/180)
+variable        yv equal sqrt(v_b*v_b-v_xyv*v_xyv)
+variable        xzv equal v_c*cos(v_beta*PI/180)
+variable        yzv equal (v_b*v_c*cos(v_alpha*PI/180)-v_xyv*v_xzv)/v_yv
+variable        zv equal sqrt(v_c*v_c-v_xzv*v_xzv-v_yzv*v_yzv)
+
+units           real
+special_bonds   lj 0.0 0.0 0.5 coul 0.0 0.0 0.8333
+#neighbor        2.0 bin
+#neigh_modify    delay 0 every 1 check yes page 1000000 one 20000 
+atom_style      full
+pair_style	 hybrid/overlay lj/cut 12.0 coul/long 12.0 
+
+bond_style	 harmonic
+dihedral_style	 charmm
+angle_style	 harmonic
+improper_style	 cvff
+
+read_restart    restart.out.2.$variavel7
+
+change_box_mol  all x final 0.0 ${a} y final 0.0 ${b} z final 0.0 ${c} xy final ${xyv} xz final ${xzv} yz final ${yzv} remap units box
+
+
+'''
+
+
+
+def re_box_energy_calc(structure_name: str,
+                reference_temperature: int,
+                runs_directory: Path,
+                ):
+    run_type = 'stage_two'
+    pscp_dir = Path(__file__).parent.parent.resolve()
+    slurm_file = pscp_dir.joinpath(Path('common').joinpath(Path("stage_two.slurm")))
+
+    structure_directory = Path(runs_directory).joinpath(structure_name)
+    if not os.path.exists(structure_directory):
+        assert False, "Structure directory does not exist - missing bulk runs"
+
+    stage_directory = structure_directory.joinpath(run_type)
+    if not os.path.exists(stage_directory):
+        assert False, "Missing lambda generation trajectory directory!"
+
+    restarts_directory = stage_directory.joinpath('restart_runs')
+    if not os.path.exists(restarts_directory):
+        assert False, "Missing lambda restart runs directory!"
+
+    run_md_name = run_type + '_box_change_' + 'run_MD.lmp'
+    run_md_path = Path(__file__).parent.resolve().joinpath(run_md_name)
+
+    lambda_runs = os.listdir(restarts_directory)
+    lambda_runs = [restarts_directory.joinpath(Path(run)) for run in lambda_runs if 'lambda_' in run]
+    num_lambdas = len(lambda_runs)
+
+    # extract box information for each run
+    box_params_dict = extract_stage_two_box_params(lambda_runs)
+
+    for lambda_ind, run_dir in enumerate(lambda_runs):
+        '''go into the restart directory'''
+        os.chdir(run_dir)
+
+        restart_files = os.listdir()
+        restart_files = [file for file in restart_files if 'restart' in file]
+
+        for restart_ind, restart_file in enumerate(restart_files):
+            for lambda_ind2, run_dir2 in enumerate(lambda_runs):
+                dx, dy, dz, xy, xz, yz = box_params_dict[str(run_dir2)]
+
+                with (open(run_md_path, "r") as read,
+                      open(run_dir.joinpath(Path('box_change_run_MD.lmp')), "w") as write):
+                    text = read.read()
+                    text = text.replace("_T_SAMPLE", str(reference_temperature))
+                    text = text.replace("_RESTART_FILE", restart_file)
+                    text = text.replace('_XV', str(dx))
+                    text = text.replace('_YV', str(dy))
+                    text = text.replace('_ZV', str(dz))
+                    text = text.replace('_XYV', str(xy))
+                    text = text.replace('_XZV', str(xz))
+                    text = text.replace('_YZV', str(yz))
+
+                    write.write(text)
+
+                msg = subprocess.run(['lmp', '-in', 'box_change_run_MD.lmp'], capture_output=True)
+
+
+def extract_stage_two_box_params(lambda_runs):
+    box_params_dict = {}
+    for lambda_ind, run_dir in enumerate(lambda_runs):
+        os.chdir(run_dir)
+        with open('stage_two_lambda_equil.data', 'r') as file:
+            lines = file.readlines()
+            for line in lines:
+                if 'xlo xhi' in line:
+                    elems = line.split(' ')
+                    dx = float(elems[1]) - float(elems[0])
+                elif 'ylo yhi' in line:
+                    elems = line.split(' ')
+                    dy = float(elems[1]) - float(elems[0])
+                elif 'zlo zhi' in line:
+                    elems = line.split(' ')
+                    dz = float(elems[1]) - float(elems[0])
+                elif 'xy xz yz' in line:
+                    elems = line.split(' ')
+                    xy, xz, yz = float(elems[0]), float(elems[1]), float(elems[2])
+
+            box_params_dict[str(run_dir)] = dx, dy, dz, xy, xz, yz
+    return box_params_dict
+
