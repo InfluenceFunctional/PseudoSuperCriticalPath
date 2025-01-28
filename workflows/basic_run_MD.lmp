@@ -31,7 +31,7 @@
 
   dump              d2 all custom ${t_print} traj.dump id mol element xu yu zu
 
-  dump_modify       d2 element 1 2 3
+  dump_modify       d2 element 1 2 3 4
 
 #--------------------------- Pre-Ramp Thermalization ------------------------#
  #_EQUILIBRATE fix f11 all npt temp ${T_init} ${T_sample} $(100.0*dt) iso 1.0 1.0 $(1000.0*dt)
