@@ -11,8 +11,8 @@ def lambda_runs(run_type: str,
                 reference_temperature: int,
                 runs_directory: Path,
                 num_restart_runs: int,
-                sampling_time: float,  # in fs
-                restart_sampling_time: float,  # in fs
+                sampling_time: int,  # in fs
+                restart_sampling_time: int,  # in fs
                 num_stage_two_restarts: Optional[int] = None,
                 ):
     pscp_dir = Path(__file__).parent.parent.resolve()

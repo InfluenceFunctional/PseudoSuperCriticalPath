@@ -1,0 +1,48 @@
+  variable          T_sample      equal 400    # Temperature
+  variable          t_run  equal _N_STEPS     # number of MD steps
+  variable          t_equil  equal _N_EQUIL_STEPS     # number of MD steps
+
+  variable          t_print equal 200  #how often to print histogram
+
+  read_restart cluster_init.restart
+
+  # load force field parameters
+  include "system.in.settings"
+
+  kspace_style    pppm 0.0001
+  comm_style tiled
+  balance 1.1 rcb
+
+  reset_timestep    0
+
+#--------------------------- Thermo stylepa and settings -------------------------#
+  timestep          1.0
+  thermo_style      custom step time vol temp press ke pe etotal epair emol vol density cella cellb cellc cellalpha cellbeta cellgamma
+  thermo            200
+
+
+#--------------------------- Computes ------------------------------------------#
+
+  compute       cc1 all chunk/atom molecule
+  compute myChunk all temp/chunk cc1 temp kecom internal
+
+  fix 1 all ave/time ${t_print} 1 ${t_print} c_myChunk[*] file tmp.out mode vector
+  fix 2 all momentum 100 linear 1 1 1 angular rescale
+
+  dump              d2 all custom ${t_print} traj.dump id mol element xu yu zu
+
+  dump_modify       d2 element 1 2 3
+
+#--------------------------- Pre-Ramp Thermalization ------------------------#
+ #_EQUILIBRATE fix f11 all npt temp ${T_init} ${T_sample} $(100.0*dt) iso 1.0 1.0 $(1000.0*dt)
+ #_EQUILIBRATE run ${t_equil}  # equilibrate
+ #_EQUILIBRATE unfix f11
+
+#---------------------- Thermostat & Barostat ----------------------------------#
+ #_NPT fix f2 all npt temp ${T_sample} ${T_sample} $(100.0*dt) iso 1.0 1.0 $(1000.0*dt)
+ #_NVT fix f2 all nvt temp ${T_sample} ${T_sample} $(100.0*dt)
+
+  run               ${t_run}
+
+  write_data        cluster_finished.data
+  write_restart   cluster_finished.restart

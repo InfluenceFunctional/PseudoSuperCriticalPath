@@ -10,7 +10,7 @@ def gen_run(run_type: str,
             reference_temperature: int,
             runs_directory: Path,
             num_restarts: int,
-            sampling_time: float,  # in fs
+            sampling_time: int,  # in fs
             ):
 
     temperature = float(reference_temperature)
@@ -20,7 +20,7 @@ def gen_run(run_type: str,
     if not os.path.exists(structure_directory):
         assert False, "Structure directory does not exist - missing bulk runs"
 
-    stage_directory = structure_directory.joinpath(run_type)
+    stage_directory = structure_directory.joinpath(Path(run_type))
     if not os.path.exists(stage_directory):
         os.mkdir(stage_directory)
 
@@ -56,7 +56,7 @@ def gen_run(run_type: str,
             print(f'making run {run_dir}')
             os.mkdir(run_dir)
 
-            copy(old_data_file_path, run_dir.joinpath(Path("cluster_equi_nvt.data")))
+            copy(old_data_file_path, run_dir.joinpath(Path("cluster_finished.data")))
             copy(init_settings_path, run_dir.joinpath(Path("new_system.in.init")))
 
             generate_system_settings_file(run_dir.joinpath(Path(new_settings_path)), old_settings_path, init_settings_path)
@@ -102,7 +102,7 @@ def process_paths(reference_temperature, head_dir):
         Path('analysis/mean_positions.xyz')
     )
     old_data_file = solid_directory.joinpath(
-        Path('cluster_equi_nvt.data')
+        Path('cluster_finished.data')
     )
     new_settings = solid_directory.joinpath(
         Path("system.in.settings.hybrid_overlay")
