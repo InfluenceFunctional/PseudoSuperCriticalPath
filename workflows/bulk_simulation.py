@@ -52,11 +52,11 @@ def md_sampling(run_type: str,
 
             with open(run_md_path, "r") as read, open(run_dir.joinpath('run_MD.lmp'), "w") as write:
                 text = read.read()
-                text = text.replace("_T_SAMPLE", str(temp))
-                text = text.replace("_N_STEPS", str(sampling_time))
+                text = text.replace("_T_SAMPLE", str(int(temp)))
+                text = text.replace("_N_STEPS", str(int(sampling_time)))
 
                 if equilibration_time is not None:
-                    text = text.replace("_N_EQUIL_STEPS", str(equilibration_time))
+                    text = text.replace("_N_EQUIL_STEPS", str(int(equilibration_time)))
                     text = text.replace("#_EQUILIBRATE", '')
 
                 if 'nvt' in run_type.lower():
