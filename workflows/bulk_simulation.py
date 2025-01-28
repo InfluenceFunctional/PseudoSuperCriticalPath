@@ -16,7 +16,7 @@ def md_sampling(run_type: str,
     pscp_dir = Path(__file__).parent.parent.resolve()
     slurm_file = pscp_dir.joinpath(Path('common').joinpath("sub_job.slurm"))
 
-    run_md_name = run_type.lower() + '_run_MD.lmp'
+    run_md_name = 'basic_run_MD.lmp'
     run_md_path = Path(__file__).parent.resolve().joinpath(run_md_name)
 
     stage_directory = structure_directory.joinpath(f'{run_type.lower}_simulations')
