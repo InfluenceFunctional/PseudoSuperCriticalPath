@@ -19,7 +19,7 @@ def md_sampling(run_type: str,
     run_md_name = 'basic_run_MD.lmp'
     run_md_path = Path(__file__).parent.resolve().joinpath(run_md_name)
 
-    stage_directory = structure_directory.joinpath(f'{run_type.lower}_simulations')
+    stage_directory = structure_directory.joinpath(f'{run_type.lower()}_simulations')
     if not os.path.exists(stage_directory):
         os.mkdir(stage_directory)
 
