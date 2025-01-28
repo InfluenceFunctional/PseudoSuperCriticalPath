@@ -1,4 +1,5 @@
-  variable          T_sample      equal 400    # Temperature
+  variable          T_sample      equal _T_SAMPLE    # Temperature
+  variable          T_init  equal _T_INIT
   variable          t_run  equal _N_STEPS     # number of MD steps
   variable          t_equil  equal _N_EQUIL_STEPS     # number of MD steps
 
