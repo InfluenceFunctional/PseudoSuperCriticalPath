@@ -3,7 +3,7 @@ import argparse
 import numpy as np
 
 from utils import process_config
-from workflows.bulk_simulation import npt_sampling, md_sampling
+from workflows.bulk_simulation import md_sampling
 from workflows.free_energy_calculation import free_energy
 from workflows.lambda_sampling import lambda_runs
 from workflows.lambda_trajectory_generation import gen_run
