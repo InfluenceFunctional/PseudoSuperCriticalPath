@@ -4,7 +4,7 @@ structure_name: 'acridine_Form2'
 runs_directory: '/vast/mk8347/pscp_runs'  # cluster
 sampling_time: 2.0e+6  # in fs
 restart_sampling_time: 1.0e+7  # in fs
-equilibration_time: 5.0e5
+equilibration_time: 5.0e+5
 
 reference_temperature: 400
 temperature_span: 100

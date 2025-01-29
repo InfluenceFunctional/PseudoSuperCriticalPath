@@ -54,10 +54,13 @@ def md_sampling(run_type: str,
                 text = read.read()
                 text = text.replace("_T_SAMPLE", str(int(temp)))
                 text = text.replace("_N_STEPS", str(int(sampling_time)))
-                if phase == 'solid':
-                    initial_temp = 100
-                elif phase == 'fluid':
-                    initial_temp = 700
+                if run_type == 'npt':
+                    initial_temp = temp
+                else:
+                    if phase == 'solid':
+                        initial_temp = 100
+                    elif phase == 'fluid':
+                        initial_temp = 700
                 text = text.replace("_T_INIT", str(int(initial_temp)))
 
                 if equilibration_time is not None:
