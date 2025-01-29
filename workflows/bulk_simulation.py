@@ -39,7 +39,7 @@ def md_sampling(run_type: str,
                 copy(old_phase_directory.joinpath('cluster_1x1x1_equi.restart'),
                      run_dir.joinpath('cluster_init.restart'))
             elif 'nvt' in run_type.lower():  # NVT runs restart from NPT runs
-                old_phase_directory = structure_directory.joinpath(Path(f'npt_simulations/{phase}/T_{int(str(temp))}'))
+                old_phase_directory = structure_directory.joinpath(Path(f'npt_simulations/{phase}/{int(str(temp))}'))
                 copy(old_phase_directory.joinpath('cluster_finished.restart'),
                      run_dir.joinpath('cluster_init.restart'))
             else:
