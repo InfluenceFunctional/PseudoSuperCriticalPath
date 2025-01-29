@@ -87,7 +87,7 @@ def gen_run(run_type: str,
 
 def process_paths(reference_temperature, head_dir):
     solid_directory = head_dir.joinpath(
-        Path(f'nvt_simulations/solid/T_{int(reference_temperature)}')
+        Path(f'nvt_simulations/solid/{int(reference_temperature)}')
     )
     init_settings = head_dir.joinpath(
         Path('bulk_solid/0/new_system.in.init')
