@@ -92,13 +92,14 @@ def re_box_energy_calc(structure_name: str,
                     write.write(text)
 
                 msg = subprocess.run(['lmp', '-in', 'box_change_run_MD.lmp'], capture_output=True)
-
+                print(msg)
+                assert False
 
 def extract_stage_two_box_params(lambda_runs):
     box_params_dict = {}
     for lambda_ind, run_dir in enumerate(lambda_runs):
         os.chdir(run_dir)
-        with open('stage_two_lambda_equil.data', 'r') as file:
+        with open('stage_two_lambda_sample.data', 'r') as file:
             lines = file.readlines()
             for line in lines:
                 if 'xlo xhi' in line:

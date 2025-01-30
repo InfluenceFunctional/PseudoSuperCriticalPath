@@ -1,7 +1,7 @@
 structure_name: 'acridine_Form4'
 
-runs_directory: 'D:\crystal_datasets\pscp_runs'  # local
-#runs_directory: '/vast/mk8347/pscp_runs'  # cluster
+#runs_directory: 'D:\crystal_datasets\pscp_runs'  # local
+runs_directory: '/vast/mk8347/pscp_runs'  # cluster
 sampling_time: 2.0e+6  # in fs
 restart_sampling_time: 1.0e+7  # in fs
 equilibration_time: 5.0e+5

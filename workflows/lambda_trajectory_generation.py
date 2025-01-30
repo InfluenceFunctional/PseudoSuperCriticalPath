@@ -49,12 +49,11 @@ def gen_run(run_type: str,
             # else:
             run_dir = stage_directory.joinpath(Path('gen_sampling'))
 
-            if os.path.exists(run_dir):
-                print(f'{run_dir} already exists! Skipping. Delete or move existing run to retry.')
-                continue
-
-            print(f'making run {run_dir}')
-            os.mkdir(run_dir)
+            if not os.path.exists(run_dir):
+                print(f'making run {run_dir}')
+                os.mkdir(run_dir)
+                # print(f'{run_dir} already exists! Skipping. Delete or move existing run to retry.')
+                # continue
 
             copy(old_data_file_path, run_dir.joinpath(Path("cluster_finished.data")))
             copy(init_settings_path, run_dir.joinpath(Path("new_system.in.init")))
