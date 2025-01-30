@@ -63,7 +63,7 @@
 
   fix f3 mobile adapt 1 kspace v_scale_coulomb scale yes
 
-  change_box_mol  all x final 0.0 ${xv} y final 0.0 ${yv} z final 0.0 ${zv} xy final ${xyv} xz final ${xzv} yz final ${yzv} remap units box
+  change_box  all x final 0.0 ${xv} y final 0.0 ${yv} z final 0.0 ${zv} xy final ${xyv} xz final ${xzv} yz final ${yzv} remap units box
 
   thermo 1
   run 1
