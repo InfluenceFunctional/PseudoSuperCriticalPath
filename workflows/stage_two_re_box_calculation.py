@@ -92,12 +92,11 @@ def re_box_energy_calc(structure_name: str,
                     text = text.replace('_YZV', str(yz))
                     text = text.replace("_RUN_INDEX", run_index)
 
-
                     write.write(text)
 
                 msg = subprocess.run(['lmp', '-in', 'box_change_run_MD.lmp'], capture_output=True)
-                print(msg)
-                assert False
+                # print(msg)
+                # assert False
 
 def extract_stage_two_box_params(lambda_runs):
     box_params_dict = {}
