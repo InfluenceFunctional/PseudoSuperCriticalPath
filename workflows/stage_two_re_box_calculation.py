@@ -71,7 +71,7 @@ def re_box_energy_calc(structure_name: str,
         os.chdir(run_dir)
 
         restart_files = os.listdir()
-        restart_files = [file for file in restart_files if 'restart' in file]
+        restart_files = [file for file in restart_files if 'stage_two_lambda_sample.restart' in file]
 
         for restart_ind, restart_file in enumerate(restart_files):
             for lambda_ind2, run_dir2 in enumerate(lambda_runs):
