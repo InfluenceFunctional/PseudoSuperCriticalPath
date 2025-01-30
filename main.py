@@ -3,11 +3,7 @@ import argparse
 import numpy as np
 
 from utils import process_config
-from workflows.bulk_simulation import md_sampling
-from workflows.free_energy_calculation import free_energy
-from workflows.lambda_sampling import lambda_runs
-from workflows.lambda_trajectory_generation import gen_run
-from workflows.stage_two_re_box_calculation import re_box_energy_calc
+
 
 '''
 # TODO
@@ -57,6 +53,7 @@ if __name__ == '__main__':
     run the code in selected mode
     '''
     if config.npt_simulation:
+        from workflows.bulk_simulation import md_sampling
         temperatures_list = np.arange(config.reference_temperature - config.temperature_span,
                                       config.reference_temperature + config.temperature_span + 1,
                                       config.temperature_delta)
@@ -69,6 +66,7 @@ if __name__ == '__main__':
             config.equilibration_time
         )
     if config.nvt_simulation:
+        from workflows.bulk_simulation import md_sampling
         md_sampling(
             'nvt',
             config.structure_name,
@@ -79,6 +77,7 @@ if __name__ == '__main__':
         )
 
     if config.stage_one_gen:
+        from workflows.lambda_trajectory_generation import gen_run
         gen_run('stage_one',
                 config.structure_name,
                 config.reference_temperature,
@@ -86,6 +85,7 @@ if __name__ == '__main__':
                 config.num_restarts,
                 config.sampling_time)
     if config.stage_two_gen:
+        from workflows.lambda_trajectory_generation import gen_run
         gen_run('stage_two',
                 config.structure_name,
                 config.reference_temperature,
@@ -93,6 +93,7 @@ if __name__ == '__main__':
                 config.num_restarts,
                 config.sampling_time)
     if config.stage_three_gen:
+        from workflows.lambda_trajectory_generation import gen_run
         gen_run('stage_three',
                 config.structure_name,
                 config.reference_temperature,
@@ -101,6 +102,7 @@ if __name__ == '__main__':
                 config.sampling_time)
 
     if config.stage_one_lambda:
+        from workflows.lambda_sampling import lambda_runs
         lambda_runs('stage_one',
                     config.structure_name,
                     config.reference_temperature,
@@ -111,6 +113,7 @@ if __name__ == '__main__':
                     config.stage_one_sampling_dir
                     )
     if config.stage_two_lambda:
+        from workflows.lambda_sampling import lambda_runs
         lambda_runs('stage_two',
                     config.structure_name,
                     config.reference_temperature,
@@ -121,6 +124,7 @@ if __name__ == '__main__':
                     config.stage_two_num_restarts
                     )
     if config.stage_three_lambda:
+        from workflows.lambda_sampling import lambda_runs
         lambda_runs('stage_three',
                     config.structure_name,
                     config.reference_temperature,
@@ -131,17 +135,20 @@ if __name__ == '__main__':
                     )
 
     if config.stage_two_re_box:
+        from workflows.stage_two_re_box_calculation import re_box_energy_calc
         re_box_energy_calc(config.structure_name,
                            config.reference_temperature,
                            config.runs_directory)
 
     if config.stage_one_free_energy:
+        from workflows.free_energy_calculation import free_energy
         free_energy('stage_one',
                     config.structure_name,
                     config.reference_temperature,
                     config.runs_directory,
                     plot_trajs=True)
     if config.stage_two_free_energy:
+        from workflows.free_energy_calculation import free_energy
         free_energy('stage_two',
                     config.structure_name,
                     config.reference_temperature,
@@ -149,6 +156,7 @@ if __name__ == '__main__':
                     plot_trajs=True
                     )
     if config.stage_three_free_energy:
+        from workflows.free_energy_calculation import free_energy
         free_energy('stage_three',
                     config.structure_name,
                     config.reference_temperature,
