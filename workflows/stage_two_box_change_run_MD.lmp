@@ -7,7 +7,7 @@
   variable 	scale_coulomb equal (${eta})^2
   variable scale_gauss equal 0
 
-  _RUN_INDEX.log
+  log _RUN_INDEX.log
   read_restart _RESTART_FILE
 
   variable xv equal _XV
