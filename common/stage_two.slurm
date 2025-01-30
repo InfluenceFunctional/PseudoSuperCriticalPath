@@ -23,5 +23,5 @@ source /scratch/work/public/singularity/greene-ib-slurm-bind.sh
   export MODULEPATH=/share/apps/modulefiles;
   module load fftw/openmpi/intel/3.3.9;
   source /ext3/env.sh;
-  python re_box_calculation.py
+  python main.py --yaml_config configs/form2_test/7.yaml
 "

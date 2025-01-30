@@ -5,8 +5,6 @@ from shutil import copy
 
 import numpy as np
 
-
-
 template = '''
 variable        xv equal v_a
 variable        xyv equal v_b*cos(v_gamma*PI/180)
@@ -35,11 +33,10 @@ change_box_mol  all x final 0.0 ${a} y final 0.0 ${b} z final 0.0 ${c} xy final 
 '''
 
 
-
 def re_box_energy_calc(structure_name: str,
-                reference_temperature: int,
-                runs_directory: Path,
-                ):
+                       reference_temperature: int,
+                       runs_directory: Path,
+                       ):
     run_type = 'stage_two'
     pscp_dir = Path(__file__).parent.parent.resolve()
     slurm_file = pscp_dir.joinpath(Path('common').joinpath(Path("stage_two.slurm")))
@@ -94,9 +91,10 @@ def re_box_energy_calc(structure_name: str,
 
                     write.write(text)
 
-                msg = subprocess.run(['lmp', '-in', 'box_change_run_MD.lmp'], capture_output=True)
+                subprocess.run(['lmp', '-in', 'box_change_run_MD.lmp'], capture_output=True)
                 # print(msg)
                 # assert False
+
 
 def extract_stage_two_box_params(lambda_runs):
     box_params_dict = {}
@@ -120,4 +118,3 @@ def extract_stage_two_box_params(lambda_runs):
 
             box_params_dict[str(run_dir)] = dx, dy, dz, xy, xz, yz
     return box_params_dict
-
