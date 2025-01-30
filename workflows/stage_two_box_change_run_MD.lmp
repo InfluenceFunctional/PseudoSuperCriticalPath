@@ -11,11 +11,11 @@
   read_restart _RESTART_FILE
 
   variable xv equal _XV
-  variable xv equal _YV
-  variable xv equal _ZV
-  variable xv equal _XYV
-  variable xv equal _XZV
-  variable xv equal _YZV
+  variable yv equal _YV
+  variable zv equal _ZV
+  variable xyv equal _XYV
+  variable xzv equal _XZV
+  variable yzv equal _YZV
 
   # Switch to hybrid/scaled style from original hybrid style.
   # This allows to adapt the LJ and Coulombic interactions differently.
