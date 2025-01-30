@@ -77,6 +77,8 @@ def re_box_energy_calc(structure_name: str,
             for lambda_ind2, run_dir2 in enumerate(lambda_runs):
                 dx, dy, dz, xy, xz, yz = box_params_dict[str(run_dir2)]
 
+                run_index = f"{lambda_ind}_{restart_ind}_{lambda_ind2}"
+
                 with (open(run_md_path, "r") as read,
                       open(run_dir.joinpath(Path('box_change_run_MD.lmp')), "w") as write):
                     text = read.read()
@@ -88,6 +90,8 @@ def re_box_energy_calc(structure_name: str,
                     text = text.replace('_XYV', str(xy))
                     text = text.replace('_XZV', str(xz))
                     text = text.replace('_YZV', str(yz))
+                    text = text.replace("_RUN_INDEX", run_index)
+
 
                     write.write(text)
 

@@ -7,6 +7,7 @@
   variable 	scale_coulomb equal (${eta})^2
   variable scale_gauss equal 0
 
+  _RUN_INDEX.log
   read_restart _RESTART_FILE
 
   variable xv equal _XV
@@ -59,12 +60,11 @@
 #---------------------- Thermostat & Barostat ----------------------------------#
 
   fix              f2 mobile nvt temp ${T_sample} ${T_sample} $(100.0*dt)
-  compute      tempcom mobile temp/com
-  fix_modify   f2 temp tempcom
 
   fix f3 mobile adapt 1 kspace v_scale_coulomb scale yes
 
   change_box_mol  all x final 0.0 ${xv} y final 0.0 ${yv} z final 0.0 ${zv} xy final ${xyv} xz final ${xzv} yz final ${yzv} remap units box
 
+  thermo 1
   run 1
 
