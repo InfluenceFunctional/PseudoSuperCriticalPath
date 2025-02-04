@@ -19,7 +19,6 @@ def free_energy(run_type: str,
                 runs_directory: str,
                 plot_trajs: bool = False,
                 ):
-
     lmax = 1
     mbar_init = "BAR"  # "BAR" "zeros"
 
@@ -35,27 +34,138 @@ def free_energy(run_type: str,
     lambda_gen_dir = stage_directory.joinpath(Path('gen_sampling'))
     lambda_restart_dir = stage_directory.joinpath(Path('restart_runs'))
 
-    lambda_dirs = os.listdir(lambda_restart_dir)
-    lambda_dirs = [dir for dir in lambda_dirs if "lambda_" in dir]
-    lambda_steps = np.sort([float(dir.split('_')[-1]) for dir in lambda_dirs]).astype(int)
-
     temperature = float(reference_temperature)  # kelvin
     npt_tmp_path = structure_directory.joinpath(
         Path(f'npt_simulations/fluid/T_{reference_temperature}/tmp.out')
     )
+
     number_molecules = np.loadtxt(npt_tmp_path, skiprows=3, max_rows=1, dtype=int)[1]
     lambda_energies_path = stage_directory.joinpath(Path("lambda_energies.npy"))
-    coul_series, gauss_series, lj_series, n_k, scale_series = load_lambda_energies(lambda_energies_path,
-                                                                                   lambda_restart_dir, lambda_steps,
-                                                                                   number_molecules)
 
-    # convert from lambda steps to lambdas
-    lambda_steps = scale_series[:, 3]
-    lambdas = lambda_steps / lambda_steps[-1]
-    lambdas = lambdas[lambdas <= lmax]
+    if run_type == 'stage_two':
+        lambda_dirs = os.listdir(lambda_restart_dir)
+        lambda_dirs = [dir for dir in lambda_dirs if "lambda_" in dir]
+        lambdas = np.sort([float(dir.split('_')[-1].replace('-', '.')) for dir in lambda_dirs])
+        lambdas = lambdas[lambdas <= lmax]
 
-    # plot energies traj
+        coul_series, gauss_series, lj_series, n_k, scale_series = load_lambda_energies(lambda_energies_path,
+                                                                                       lambda_restart_dir, lambdas,
+                                                                                       number_molecules)
 
+        mbar_init = 'zeros'
+        result = volumetric_free_energy_calculation(lambda_restart_dir, lambdas, number_molecules,
+                                                    reference_temperature,
+                                                    stage_directory, mbar_init, plot_trajs, coul_series, gauss_series,
+                                                    lj_series,
+                                                    n_k)
+
+    else:
+        # convert from lambda steps to lambdas
+        lambda_dirs = os.listdir(lambda_restart_dir)
+        lambda_dirs = [dir for dir in lambda_dirs if "lambda_" in dir]
+
+        lambda_steps = np.sort([float(dir.split('_')[-1]) for dir in lambda_dirs]).astype(int)
+
+        lambdas = lambda_steps / lambda_steps[-1]
+        lambdas = lambdas[lambdas <= lmax]
+
+        coul_series, gauss_series, lj_series, n_k, scale_series = load_lambda_energies(lambda_energies_path,
+                                                                                       lambda_restart_dir, lambda_steps,
+                                                                                       number_molecules)
+
+        result = alchemical_free_energy_calculation(coul_series, gauss_series, lambdas, lj_series, mbar_init, n_k,
+                                                    number_molecules, plot_trajs, scale_series, temperature)
+
+    np.save(structure_directory.joinpath(run_type + '_free_energy'), result)
+
+
+def volumetric_free_energy_calculation(lambda_restart_dir, lambdas, number_molecules, reference_temperature,
+                                       stage_directory, mbar_init, plot_trajs, coul_series, gauss_series, lj_series,
+                                       old_n_k):
+    box_energies_path = stage_directory.joinpath(Path("box_energies.npy"))
+
+    run_directory = lambda_restart_dir.joinpath(Path(f"lambda_{1}"))
+    restart_files = os.listdir(run_directory)
+    restart_files = [dir for dir in restart_files if "stage_two_lambda_sample.restart" in dir]
+    num_restarts = len(restart_files)
+    if not os.path.exists(box_energies_path):
+
+        # process re_boxed energies
+        all_box_potentials = np.zeros((len(lambdas), num_restarts, len(lambdas)))
+        all_box_volumes = np.zeros((len(lambdas), num_restarts, len(lambdas)))
+        for ind, lmbd in enumerate(tqdm(lambdas)):
+            lmbd_str = f"{lmbd:.3g}".replace('.', '-')
+            run_directory = lambda_restart_dir.joinpath(Path(f"lambda_{lmbd_str}"))
+            assert (np.loadtxt(run_directory.joinpath("tmp.out"), skiprows=3, max_rows=1, dtype=int)[1]
+                    == number_molecules)
+
+            snapshot_files = os.listdir(run_directory)
+            snapshot_files = [file for file in snapshot_files if ('.log' in file and 'screen' not in file)]
+
+            for f_ind, file in enumerate(snapshot_files):
+                ff = file[:-4].split('_')
+                i1, i2, i3 = int(ff[0]), int(ff[1]), int(ff[2])
+                log_file = run_directory.joinpath(file)
+                data = pd.read_csv(log_file, skiprows=compose_row_function(log_file, False), sep=r"\s+")
+                all_box_potentials[i1, i2, i3] = data['PotEng'][0]
+                all_box_volumes[i1, i2, i3] = data['Volume'][0]
+        N = number_molecules
+        beta = (1.0 / (unit.BOLTZMANN_CONSTANT_kB
+                       * (reference_temperature * unit.kelvin)
+                       * unit.AVOGADRO_CONSTANT_NA)).value_in_unit(unit.kilocalorie_per_mole ** (-1))
+        reduced_pot = -N * np.log(all_box_volumes) + all_box_potentials * beta
+        np.save(box_energies_path, reduced_pot)
+    else:
+        reduced_pot = np.load(box_energies_path, allow_pickle=True)
+
+    '''free energy calculation'''
+    ukn = np.zeros((len(lambdas), reduced_pot.shape[-1] * reduced_pot.shape[-2]))
+    for ind in range(len(lambdas)):
+        ukn[ind] = reduced_pot[ind].T.flatten()
+
+    n_k = np.ones(len(lambdas)).astype(int) * num_restarts
+
+    k_vals = np.linspace(0, len(lambdas) - 2, 25).astype(int)
+    batch = np.repeat(np.arange(len(lambdas)), n_k, axis=0)
+    flat_pot = []
+    for iL in range(len(lambdas)):
+        flat_pot.extend(reduced_pot[iL, :, iL])
+    flat_pot = np.array(flat_pot)
+
+    if plot_trajs:
+        plot_effective_lambda_energy_traj(coul_series, gauss_series, lambdas, lj_series, old_n_k, number_molecules)
+        plot_effective_lambda_energy_traj(flat_pot, flat_pot, lambdas, flat_pot, n_k, number_molecules)
+
+        plot_overlaps(batch, k_vals, ukn, num_lambdas=len(lambdas))
+        plot_energy_traj(batch, lambdas, ukn)
+
+    mbar = pymbar.MBAR(ukn / number_molecules, n_k, initialize=mbar_init)  #, n_bootstraps=50)
+    result = mbar.compute_free_energy_differences()  #uncertainty_method='bootstrap')
+    if plot_trajs:
+        overlap = mbar.compute_overlap()
+        nn_overlap = np.array([overlap['matrix'][i, i + 1] for i in range(len(overlap['matrix']) - 1)])
+        fig = make_subplots(rows=1, cols=4)
+        fig.add_scatter(x=lambdas, y=result['Delta_f'][0, :] / number_molecules,
+                        error_y=dict(type='data', array=[result['dDelta_f'][0, :] / number_molecules], visible=True),
+                        showlegend=False,
+                        row=1, col=1
+                        )
+        fig.add_heatmap(z=overlap['matrix'], y=lambdas, x=lambdas, text=np.round(overlap['matrix'], 2),
+                        texttemplate="%{text:.2g}", showscale=False, showlegend=False,
+                        colorscale='blues', row=1, col=2)
+        fig.add_scatter(x=lambdas, y=flat_pot, name='Reduced Pot', row=1, col=3)
+
+        fig.add_scatter(x=lambdas[1:], y=nn_overlap, name="Nearest-Neighbor overlap", row=1, col=4)
+        fig.update_layout(xaxis1_title='Lambda', yaxis1_title='Free Energy Difference',
+                          xaxis2_title='Lambda', yaxis2_title='Lambda',
+                          xaxis3_title='Lambda', yaxis3_title='Scaling Factor')
+        fig.show(renderer='browser')
+
+    return result
+
+
+def alchemical_free_energy_calculation(coul_series, gauss_series, lambdas, lj_series, mbar_init, n_k, number_molecules,
+                                       plot_trajs, scale_series, temperature):
     # compute total inter potential (with appropriate scaling) for full traj
     ukn = np.zeros((len(lambdas), len(coul_series)))
     beta = (1.0 / (unit.BOLTZMANN_CONSTANT_kB
@@ -67,19 +177,15 @@ def free_energy(run_type: str,
                   scale_series[i, 2] * gauss_series)
 
         ukn[i, :] = beta * energy
-
     max_ind = np.sum(n_k[:len(lambdas)])
     n_k = n_k[:len(lambdas)]
     ukn = ukn[:, :max_ind]
-
     k_vals = np.linspace(0, len(lambdas) - 2, 25).astype(int)
     batch = np.repeat(np.arange(len(lambdas)), n_k, axis=0)
-
     if plot_trajs:
         plot_effective_lambda_energy_traj(coul_series, gauss_series, lambdas, lj_series, n_k, number_molecules)
         plot_overlaps(batch, k_vals, ukn)
         plot_energy_traj(batch, lambdas, ukn)
-
     # free energy calculation
     max_samples = 100000
     sample_inds = []
@@ -89,40 +195,37 @@ def free_energy(run_type: str,
         samples_to_add = np.linspace(0, n_of_k - 1, min(max_samples, n_of_k)).astype(int)
         sample_inds.append(cum_nk[ind] + samples_to_add)
         new_nk.append(len(samples_to_add))
-
     sample_inds = np.concatenate(sample_inds)
     new_ukn = ukn[:, sample_inds]
     new_nk = np.array(new_nk)
-
-    mbar = pymbar.MBAR(new_ukn, new_nk, initialize=mbar_init, n_bootstraps=200)
-    result = mbar.compute_free_energy_differences(uncertainty_method='bootstrap')
-
-    # opt plot overlap matrix
-    overlap = mbar.compute_overlap()
-    nn_overlap = np.array([overlap['matrix'][i, i + 1] for i in range(len(overlap['matrix']) - 1)])
-    fig = make_subplots(rows=1, cols=4)
-    fig.add_scatter(x=lambdas, y=result['Delta_f'][0, :] / number_molecules,
-                    error_y=dict(type='data', array=[result['dDelta_f'][0, :] / number_molecules], visible=True),
-                    showlegend=False,
-                    row=1, col=1
-                    )
-
-    fig.add_heatmap(z=overlap['matrix'], y=lambdas, x=lambdas, text=np.round(overlap['matrix'], 2),
-                    texttemplate="%{text:.2g}", showscale=False, showlegend=False,
-                    colorscale='blues', row=1, col=2)
-
-    fig.add_scatter(x=lambdas, y=scale_series[:, 0], name='Coul Scale', row=1, col=3)
-    fig.add_scatter(x=lambdas, y=scale_series[:, 1], name='LJ Scale', row=1, col=3)
-    fig.add_scatter(x=lambdas, y=scale_series[:, 2], name='Gauss Scale', row=1, col=3)
-    fig.add_scatter(x=lambdas[1:], y=nn_overlap, name="Nearest-Neighbor overlap", row=1, col=4)
-    fig.update_layout(xaxis1_title='Lambda', yaxis1_title='Free Energy Difference',
-                      xaxis2_title='Lambda', yaxis2_title='Lambda',
-                      xaxis3_title='Lambda', yaxis3_title='Scaling Factor')
-    fig.show(renderer='browser')
+    mbar = pymbar.MBAR(new_ukn, new_nk, initialize=mbar_init)  #, n_bootstraps=200)
+    result = mbar.compute_free_energy_differences()  #uncertainty_method='bootstrap')
+    if plot_trajs:
+        # opt plot overlap matrix
+        overlap = mbar.compute_overlap()
+        nn_overlap = np.array([overlap['matrix'][i, i + 1] for i in range(len(overlap['matrix']) - 1)])
+        fig = make_subplots(rows=1, cols=4)
+        fig.add_scatter(x=lambdas, y=result['Delta_f'][0, :] / number_molecules,
+                        error_y=dict(type='data', array=[result['dDelta_f'][0, :] / number_molecules], visible=True),
+                        showlegend=False,
+                        row=1, col=1
+                        )
+        fig.add_heatmap(z=overlap['matrix'], y=lambdas, x=lambdas, text=np.round(overlap['matrix'], 2),
+                        texttemplate="%{text:.2g}", showscale=False, showlegend=False,
+                        colorscale='blues', row=1, col=2)
+        fig.add_scatter(x=lambdas, y=scale_series[:, 0], name='Coul Scale', row=1, col=3)
+        fig.add_scatter(x=lambdas, y=scale_series[:, 1], name='LJ Scale', row=1, col=3)
+        fig.add_scatter(x=lambdas, y=scale_series[:, 2], name='Gauss Scale', row=1, col=3)
+        fig.add_scatter(x=lambdas[1:], y=nn_overlap, name="Nearest-Neighbor overlap", row=1, col=4)
+        fig.update_layout(xaxis1_title='Lambda', yaxis1_title='Free Energy Difference',
+                          xaxis2_title='Lambda', yaxis2_title='Lambda',
+                          xaxis3_title='Lambda', yaxis3_title='Scaling Factor')
+        fig.show(renderer='browser')
+    return result
 
 
-def plot_overlaps(batch, k_vals, ukn):
-    fig = make_subplots(rows=5, cols=5, subplot_titles=[f"Lambda = {k / 100:.2g}" for k in k_vals])
+def plot_overlaps(batch, k_vals, ukn, num_lambdas=100):
+    fig = make_subplots(rows=5, cols=5, subplot_titles=[f"Lambda = {k / num_lambdas:.2g}" for k in k_vals])
     for ind in range(25):
         row = ind // 5 + 1
         col = ind % 5 + 1
@@ -145,7 +248,7 @@ def plot_energy_traj(batch, lambdas, ukn):
     # plot lambda profile
     fig = go.Figure(
         go.Scatter(
-            x=lambdas, y=means, mode='lines+markers', error_y=dict(type='data', array=stds ** 2, visible=True)
+            x=lambdas, y=means, mode='lines+markers', error_y=dict(type='data', array=stds, visible=True)
         )
     )
     fig.update_layout(xaxis_title='Lambda', yaxis_title='Energy')
@@ -178,7 +281,7 @@ def plot_effective_lambda_energy_traj(coul_series, gauss_series, lambdas, lj_ser
     fig.show(renderer='browser')
 
 
-def load_lambda_energies(lambda_energies_path, lambda_restart_dir, lambda_steps, number_molecules):
+def load_lambda_energies(lambda_energies_path, lambda_restart_dir, lambdas, number_molecules):
     if os.path.isfile(lambda_energies_path):
         lambda_energies = np.load(lambda_energies_path, allow_pickle=True).item()
         coul_series = lambda_energies['coul']
@@ -191,7 +294,7 @@ def load_lambda_energies(lambda_energies_path, lambda_restart_dir, lambda_steps,
         print("Reading timeseries.")
         coul_series, gauss_series, lj_series, n_k, scale_series = (
             extract_run_inter_energies(lambda_restart_dir,
-                                       lambda_steps,
+                                       lambdas,
                                        number_molecules))
 
         lambda_energies = {
@@ -206,14 +309,15 @@ def load_lambda_energies(lambda_energies_path, lambda_restart_dir, lambda_steps,
     return coul_series, gauss_series, lj_series, n_k, scale_series
 
 
-def extract_run_inter_energies(lambda_restart_dir, lambda_steps, number_molecules):
+def extract_run_inter_energies(lambda_restart_dir, lambdas, number_molecules):
     coul_series = np.empty(0)
     lj_series = np.empty(0)
     gauss_series = np.empty(0)
     n_k = np.empty(0, dtype=int)
-    scale_series = np.zeros((len(lambda_steps), 4))
-    for ind, lmbd in enumerate(tqdm(lambda_steps)):
-        run_directory = lambda_restart_dir.joinpath(Path(f"lambda_{lmbd}"))
+    scale_series = np.zeros((len(lambdas), 4))
+    for ind, lmbd in enumerate(tqdm(lambdas)):
+        lmbd_str = f"{lmbd:.3g}".replace('.', '-')
+        run_directory = lambda_restart_dir.joinpath(Path(f"lambda_{lmbd_str}"))
         assert (np.loadtxt(run_directory.joinpath("tmp.out"), skiprows=3, max_rows=1, dtype=int)[1]
                 == number_molecules)
         log_file = run_directory.joinpath("screen.log")
@@ -222,7 +326,7 @@ def extract_run_inter_energies(lambda_restart_dir, lambda_steps, number_molecule
             data = pd.read_csv(log_file, skiprows=compose_row_function(log_file, False), sep=r"\s+")
         except ValueError as e:
             if str(e) == "No valid rows found":
-                lambda_steps = lambda_steps[lambda_steps != lmbd]
+                lambdas = lambdas[lambdas != lmbd]
                 print(str(e))
                 continue
             else:
@@ -255,3 +359,97 @@ def extract_run_inter_energies(lambda_restart_dir, lambda_steps, number_molecule
     assert len(coul_series) == np.sum(n_k)
 
     return coul_series, gauss_series, lj_series, n_k, scale_series
+
+
+def relative_free_energy(
+        structure_name: str,
+        reference_temperature: int,
+        runs_directory: str,
+):
+    temperature_step = 10  # Kelvin
+    minimum_temperature = 300  # Kelvin
+    maximum_temperature = 500  # Kelvin
+    pressure = 1.0  # atm
+    temperatures = np.arange(minimum_temperature, maximum_temperature + temperature_step, temperature_step)
+    fluid_directory = "npt_simulations/fluid"
+    solid_directory = "npt_simulations/solid"
+
+    number_molecules = np.loadtxt("npt_simulations/fluid/T_300/tmp.out", skiprows=3, max_rows=1, dtype=int)[1]
+
+    for directory_index, directory in enumerate((fluid_directory, solid_directory)):
+        if os.path.isfile(f"{directory}/flat_data_series.txt") and os.path.isfile(f"{directory}/n_k.txt"):
+            data_series = np.loadtxt(f"{directory}/flat_data_series.txt")
+            n_k = np.loadtxt(f"{directory}/n_k.txt", dtype=int)
+            assert len(data_series) == np.sum(n_k)
+        else:
+            print("Reading timeseries.")
+            data_series = np.empty(0)
+            n_k = np.empty(0, dtype=int)
+            for temperature in temperatures:
+                assert (np.loadtxt(f"{directory}/T_{temperature}/tmp.out", skiprows=3, max_rows=1, dtype=int)[1]
+                        == number_molecules)
+                log_file = f"{directory}/T_{temperature}/screen.log"
+                # noinspection PyTypeChecker
+                data = pd.read_csv(log_file, skiprows=compose_row_function(log_file, True), sep=r"\s+")
+                data_full = (data["PotEng"].to_numpy() * unit.kilocalorie_per_mole +
+                             pressure * data["Volume"].to_numpy()
+                             * unit.AVOGADRO_CONSTANT_NA * (unit.atmosphere * unit.angstrom ** 3))
+                t0, g, Neff_max = timeseries.detect_equilibration(
+                    data_full)  # compute indices of uncorrelated timeseries
+                data_equil = data_full[t0:]
+                indices = timeseries.subsample_correlated_data(data_equil, g=g)
+                data = data_equil[indices]
+                n_k = np.append(n_k, len(data))
+                data_series = np.append(data_series, data)
+            np.savetxt(f"{directory}/flat_data_series.txt", data_series)
+            np.savetxt(f"{directory}/n_k.txt", n_k, fmt="%i")
+            assert len(data_series) == np.sum(n_k)
+            print("Finished reading timeseries.")
+
+        # eqn 2 in the paper
+        ukn = np.zeros((len(temperatures), len(data_series)))
+        for i, temperature in enumerate(temperatures):
+            beta = (1.0 / (unit.BOLTZMANN_CONSTANT_kB
+                           * (temperature * unit.kelvin)
+                           * unit.AVOGADRO_CONSTANT_NA)).value_in_unit(unit.kilocalorie_per_mole ** (-1))
+            ukn[i, :] = beta * data_series[:]
+
+        mbar = pymbar.MBAR(ukn, n_k, initialize="BAR")
+        result = mbar.compute_free_energy_differences()
+        plt.errorbar(temperatures, result["Delta_f"][0, :] / number_molecules,
+                     yerr=result["dDelta_f"][0, :] / number_molecules, label=directory,
+                     color=f"C{directory_index}")
+        entropy = -np.gradient(result["Delta_f"][0, :], temperature_step)
+        heat_capacity = temperatures * np.gradient(entropy, temperature_step)
+        plt.plot(temperatures, -np.gradient(result["Delta_f"][0, :], temperature_step),
+                 color=f"C{directory_index}", linestyle="--")
+        plt.plot(temperatures, heat_capacity, color=f"C{directory_index}", linestyle=":")
+
+    return result
+
+def loop_free_energy(
+        structure_name: str,
+        reference_temperature: int,
+        runs_directory: str,
+):
+    structure_directory = Path(runs_directory).joinpath(structure_name)
+
+    npt_tmp_path = structure_directory.joinpath(
+        Path(f'npt_simulations/fluid/T_{reference_temperature}/tmp.out')
+    )
+    number_molecules = np.loadtxt(npt_tmp_path, skiprows=3, max_rows=1, dtype=int)[1]
+
+    dgs = []
+    ddgs = []
+    for stage in ['stage_one', 'stage_two', 'stage_three']:
+        results_path = structure_directory.joinpath(stage + '_free_energy.npy')
+        results = np.load(results_path, allow_pickle=True).item()
+        dG = results['Delta_f']
+        ddG = results['dDelta_f']
+        if stage != 'stage_two':
+            dG /= number_molecules
+            ddG /= number_molecules
+        dgs.append(dG)
+        ddgs.append(ddG)
+
+    return None
