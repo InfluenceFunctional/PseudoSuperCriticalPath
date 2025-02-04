@@ -163,8 +163,8 @@ if __name__ == '__main__':
                     config.runs_directory,
                     plot_trajs=config.show_plots)
 
-    if config.full_loop_free_energy:
-        from workflows.free_energy_calculation import loop_free_energy
-        loop_free_energy(config.structure_name,
-                         config.reference_temperature,
-                         config.runs_directory)
+    # if config.full_loop_free_energy:
+    #     from workflows.free_energy_calculation import loop_free_energy
+    #     loop_free_energy(config.structure_name,
+    #                      config.reference_temperature,
+    #                      config.runs_directory)
