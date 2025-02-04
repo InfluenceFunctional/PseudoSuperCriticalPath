@@ -427,6 +427,7 @@ def relative_free_energy(
 
     return result
 
+
 def loop_free_energy(
         structure_name: str,
         reference_temperature: int,

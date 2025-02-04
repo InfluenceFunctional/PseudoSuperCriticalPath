@@ -25,7 +25,7 @@ stage_two_gen: False
 stage_three_gen: False
 
 stage_one_lambda: False
-stage_two_lambda: False
+stage_two_lambda: True
 stage_three_lambda: False
 
 stage_two_re_box: False
@@ -34,5 +34,5 @@ stage_one_free_energy: False
 stage_two_free_energy: False
 stage_three_free_energy: False
 
-full_loop_free_energy: True
+full_loop_free_energy: False
 
