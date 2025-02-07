@@ -51,6 +51,7 @@ def load_yaml(path):
 
 
 def process_config(cmdline_args):
+    base_config = load_yaml('configs/base.yaml')
     cmdline_keys = [
         arg.strip("--").split("=")[0] for arg in cmdline_args if "--" in arg
     ]
@@ -58,5 +59,10 @@ def process_config(cmdline_args):
         arg for arg in cmdline_args if "--" not in arg
     ]
     cmdline_dict = {key: val for key, val in zip(cmdline_keys, cmdline_values)}
-    config = dict2namespace(load_yaml(cmdline_dict['yaml_config']))
+    config = load_yaml(cmdline_dict['yaml_config'])
+    # overwrite missing keys from base config
+    for key in base_config.keys():
+        if key not in config.keys():
+            config[key] = base_config[key]
+    config = dict2namespace(config)
     return config

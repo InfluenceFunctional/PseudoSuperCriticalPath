@@ -140,6 +140,15 @@ if __name__ == '__main__':
                            config.reference_temperature,
                            config.runs_directory)
 
+    if config.bulk_free_energy:
+        from workflows.free_energy_calculation import relative_free_energy
+        relative_free_energy(config.structure_name,
+                             config.reference_temperature,
+                             config.runs_directory,
+                             config.temperature_span,
+                             config.temperature_delta,
+                             plot_trajs=config.show_plots,
+                             )
     if config.stage_one_free_energy:
         from workflows.free_energy_calculation import free_energy
         free_energy('stage_one',
@@ -163,8 +172,11 @@ if __name__ == '__main__':
                     config.runs_directory,
                     plot_trajs=config.show_plots)
 
-    # if config.full_loop_free_energy:
-    #     from workflows.free_energy_calculation import loop_free_energy
-    #     loop_free_energy(config.structure_name,
-    #                      config.reference_temperature,
-    #                      config.runs_directory)
+    if config.full_loop_free_energy:
+        from workflows.free_energy_calculation import loop_free_energy
+        loop_free_energy(config.structure_name,
+                         config.reference_temperature,
+                         config.runs_directory,
+                         config.temperature_span,
+                         config.temperature_delta,
+                        )

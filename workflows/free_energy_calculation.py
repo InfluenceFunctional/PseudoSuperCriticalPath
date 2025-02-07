@@ -365,30 +365,43 @@ def relative_free_energy(
         structure_name: str,
         reference_temperature: int,
         runs_directory: str,
+        temperature_span: int,
+        temperature_delta: int,
+        plot_trajs: bool,
 ):
-    temperature_step = 10  # Kelvin
-    minimum_temperature = 300  # Kelvin
-    maximum_temperature = 500  # Kelvin
+    minimum_temperature = reference_temperature - temperature_span  # Kelvin
+    maximum_temperature = reference_temperature + temperature_span  # Kelvin
     pressure = 1.0  # atm
-    temperatures = np.arange(minimum_temperature, maximum_temperature + temperature_step, temperature_step)
-    fluid_directory = "npt_simulations/fluid"
-    solid_directory = "npt_simulations/solid"
+    temperatures = np.arange(minimum_temperature, maximum_temperature + temperature_delta, temperature_delta)
 
-    number_molecules = np.loadtxt("npt_simulations/fluid/T_300/tmp.out", skiprows=3, max_rows=1, dtype=int)[1]
+    structure_directory = Path(runs_directory).joinpath(structure_name)
 
-    for directory_index, directory in enumerate((fluid_directory, solid_directory)):
-        if os.path.isfile(f"{directory}/flat_data_series.txt") and os.path.isfile(f"{directory}/n_k.txt"):
-            data_series = np.loadtxt(f"{directory}/flat_data_series.txt")
-            n_k = np.loadtxt(f"{directory}/n_k.txt", dtype=int)
-            assert len(data_series) == np.sum(n_k)
+    if not os.path.exists(structure_directory):
+        assert False, "Structure directory does not exist - missing bulk runs"
+
+    fluid_directory = structure_directory.joinpath("npt_simulations/fluid")
+    solid_directory = structure_directory.joinpath("npt_simulations/solid")
+
+    npt_tmp_path = structure_directory.joinpath(
+        Path(f'npt_simulations/fluid/T_{reference_temperature}/tmp.out')
+    )
+    number_molecules = np.loadtxt(npt_tmp_path, skiprows=3, max_rows=1, dtype=int)[1]
+    for directory_index, (directory, state) in enumerate(zip((fluid_directory, solid_directory), ('fluid', 'solid'))):
+        energies_path = structure_directory.joinpath(f"{state}_bulk_energies.npy")
+
+        if os.path.isfile(energies_path):
+            pass
+
         else:
             print("Reading timeseries.")
             data_series = np.empty(0)
             n_k = np.empty(0, dtype=int)
-            for temperature in temperatures:
-                assert (np.loadtxt(f"{directory}/T_{temperature}/tmp.out", skiprows=3, max_rows=1, dtype=int)[1]
-                        == number_molecules)
-                log_file = f"{directory}/T_{temperature}/screen.log"
+            for temperature in tqdm(temperatures):
+                run_dir = directory.joinpath(f"T_{temperature}")
+                tmp_path = run_dir.joinpath('tmp.out')
+                screen_path = run_dir.joinpath('screen.log')
+                assert (np.loadtxt(tmp_path, skiprows=3, max_rows=1, dtype=int)[1] == number_molecules)
+                log_file = screen_path
                 # noinspection PyTypeChecker
                 data = pd.read_csv(log_file, skiprows=compose_row_function(log_file, True), sep=r"\s+")
                 data_full = (data["PotEng"].to_numpy() * unit.kilocalorie_per_mole +
@@ -401,12 +414,23 @@ def relative_free_energy(
                 data = data_equil[indices]
                 n_k = np.append(n_k, len(data))
                 data_series = np.append(data_series, data)
-            np.savetxt(f"{directory}/flat_data_series.txt", data_series)
-            np.savetxt(f"{directory}/n_k.txt", n_k, fmt="%i")
             assert len(data_series) == np.sum(n_k)
-            print("Finished reading timeseries.")
 
-        # eqn 2 in the paper
+        state_energies = {'PotEng': data_series, 'n_k': n_k}
+        np.save(energies_path, state_energies)
+        print("Finished reading timeseries.")
+
+    # eqn 2 in the paper
+
+    results_list = []
+    overlaps_list = []
+    for directory_index, (directory, state) in enumerate(zip((fluid_directory, solid_directory), ('fluid', 'solid'))):
+        energies_path = structure_directory.joinpath(f"{state}_bulk_energies.npy")
+        state_energies = np.load(energies_path, allow_pickle=True).item()
+        data_series = state_energies['PotEng']
+        n_k = state_energies['n_k']
+        assert len(data_series) == np.sum(n_k)
+
         ukn = np.zeros((len(temperatures), len(data_series)))
         for i, temperature in enumerate(temperatures):
             beta = (1.0 / (unit.BOLTZMANN_CONSTANT_kB
@@ -415,23 +439,71 @@ def relative_free_energy(
             ukn[i, :] = beta * data_series[:]
 
         mbar = pymbar.MBAR(ukn, n_k, initialize="BAR")
+        overlap = mbar.compute_overlap()
         result = mbar.compute_free_energy_differences()
-        plt.errorbar(temperatures, result["Delta_f"][0, :] / number_molecules,
-                     yerr=result["dDelta_f"][0, :] / number_molecules, label=directory,
-                     color=f"C{directory_index}")
-        entropy = -np.gradient(result["Delta_f"][0, :], temperature_step)
-        heat_capacity = temperatures * np.gradient(entropy, temperature_step)
-        plt.plot(temperatures, -np.gradient(result["Delta_f"][0, :], temperature_step),
-                 color=f"C{directory_index}", linestyle="--")
-        plt.plot(temperatures, heat_capacity, color=f"C{directory_index}", linestyle=":")
+        results_list.append(result)
+        overlaps_list.append(overlap)
 
-    return result
+    if plot_trajs:
+        fig = make_subplots(rows=1, cols=4)
+        for phase_ind, (result, overlap, state) in enumerate(zip(results_list, overlaps_list, ['fluid', 'solid'])):
+            nn_overlap = np.array([overlap['matrix'][i, i + 1] for i in range(len(overlap['matrix']) - 1)])
+
+            if state == 'fluid':
+                fig.add_scatter(x=temperatures, y=result['Delta_f'][0, :] / number_molecules,
+                                error_y=dict(type='data', array=[result['dDelta_f'][0, :] / number_molecules],
+                                             visible=True),
+                                showlegend=True,
+                                name=state, legendgroup=state, marker_color='blue',
+                                row=1, col=1
+                                )
+                fig.add_heatmap(z=overlap['matrix'], y=temperatures, x=temperatures,
+                                text=np.round(overlap['matrix'], 2),
+                                texttemplate="%{text:.2g}", showscale=False, showlegend=False,
+                                colorscale='blues', row=1, col=2)
+
+                fig.add_scatter(x=temperatures[1:], y=nn_overlap, showlegend=False, marker_color='blue',
+                                name=state, legendgroup=state, row=1, col=4)
+            else:
+                fig.add_scatter(x=temperatures, y=result['Delta_f'][0, :] / number_molecules,
+                                error_y=dict(type='data', array=[result['dDelta_f'][0, :] / number_molecules],
+                                             visible=True),
+                                showlegend=True,
+                                name=state, legendgroup=state, marker_color='red',
+                                row=1, col=1
+                                )
+                fig.add_heatmap(z=overlap['matrix'], y=temperatures, x=temperatures,
+                                text=np.round(overlap['matrix'], 2),
+                                texttemplate="%{text:.2g}", showscale=False, showlegend=False,
+                                colorscale='blues', row=1, col=3)
+
+                fig.add_scatter(x=temperatures[1:], y=nn_overlap, showlegend=False, marker_color='red',
+                                name=state, legendgroup=state, row=1, col=4)
+            fig.update_layout(xaxis1_title='Temperature (K)', yaxis1_title='Free Energy Difference',
+                              xaxis2_title='Temperature (K)', yaxis2_title='Temperature (K)',
+                              xaxis3_title='Temperature (K)', yaxis3_title='Temperature (K)',
+                              xaxis4_title='Temperature (K)', yaxis4_title='Nearest-Neighbor Overlap')
+
+        fig.show(renderer='browser')
+    # plt.errorbar(temperatures, result["Delta_f"][0, :] / number_molecules,
+    #              yerr=result["dDelta_f"][0, :] / number_molecules, label=directory,
+    #              color=f"C{directory_index}")
+    # entropy = -np.gradient(result["Delta_f"][0, :], temperature_step)
+    # heat_capacity = temperatures * np.gradient(entropy, temperature_step)
+    # plt.plot(temperatures, -np.gradient(result["Delta_f"][0, :], temperature_step),
+    #          color=f"C{directory_index}", linestyle="--")
+    # plt.plot(temperatures, heat_capacity, color=f"C{directory_index}", linestyle=":")
+
+    np.save(structure_directory.joinpath('fluid_free_energy'), results_list[0])
+    np.save(structure_directory.joinpath('solid_free_energy'), results_list[1])
 
 
 def loop_free_energy(
         structure_name: str,
         reference_temperature: int,
         runs_directory: str,
+        temperature_span: int,
+        temperature_delta: int
 ):
     structure_directory = Path(runs_directory).joinpath(structure_name)
 
@@ -440,9 +512,13 @@ def loop_free_energy(
     )
     number_molecules = np.loadtxt(npt_tmp_path, skiprows=3, max_rows=1, dtype=int)[1]
 
+    minimum_temperature = reference_temperature - temperature_span  # Kelvin
+    maximum_temperature = reference_temperature + temperature_span  # Kelvin
+    temperatures = np.arange(minimum_temperature, maximum_temperature + temperature_delta, temperature_delta)
+
     dgs = []
     ddgs = []
-    for stage in ['stage_one', 'stage_two', 'stage_three']:
+    for stage in ['stage_one', 'stage_two', 'stage_three', 'fluid', 'solid']:
         results_path = structure_directory.joinpath(stage + '_free_energy.npy')
         results = np.load(results_path, allow_pickle=True).item()
         dG = results['Delta_f']
@@ -450,7 +526,57 @@ def loop_free_energy(
         if stage != 'stage_two':
             dG /= number_molecules
             ddG /= number_molecules
-        dgs.append(dG)
-        ddgs.append(ddG)
+        dgs.append(dG[0, :])
+        ddgs.append(ddG[0, :])
+
+    fig = go.Figure()
+    ylevel = 0
+    xlevel = 0
+    stage_names = ['stage one', 'stage two', 'stage three']
+    for ind in range(3):
+        fig.add_scatter(x=np.arange(len(dgs[ind])) + xlevel,
+                        y=dgs[ind] - dgs[ind][0] + ylevel,
+                        name=stage_names[ind], )
+        ylevel += dgs[ind][-1]
+        xlevel += len(dgs[ind]) - 1
+    fig.add_scatter(x=[0, xlevel], y=[0, ylevel], mode='lines', name='Overall')
+    fig.update_layout(title='Alchemical Profile', yaxis_title='Free Energy', xaxis_title="Lambda Steps")
+    fig.show(renderer='browser')
+
+    dG_T_ref = -ylevel
+    dF_bulk = dgs[-1] - dgs[-2]
+    tref_ind = np.argwhere(temperatures == reference_temperature).flatten()
+    dF_ref = dF_bulk[tref_ind]
+    # from equation 4, dG(l,s) = kbT[dF(T)-dF(T_ref)] + (T/T_ref)*dG(T_ref)
+    temp_free_energies = np.zeros(len(temperatures))
+    bulk_ddF = np.zeros(len(temperatures))
+    dG_T = np.zeros(len(temperatures))
+    for ind, temp in enumerate(temperatures):
+        beta = (1.0 / (unit.BOLTZMANN_CONSTANT_kB
+                       * (temp * unit.kelvin)
+                       * unit.AVOGADRO_CONSTANT_NA)).value_in_unit(unit.kilocalorie_per_mole ** (-1))
+        bulk_ddF[ind] = (dF_bulk[ind] - dF_ref) / beta
+        dG_T[ind] = (temp / reference_temperature) * dG_T_ref
+        temp_free_energies[ind] = (dF_bulk[ind] - dF_ref) / beta + (temp / reference_temperature) * dG_T_ref
+
+    interp_temps = np.linspace(temperatures[0], temperatures[-1], 10000)
+    dg_interps = np.interp(interp_temps, temperatures, temp_free_energies)
+    melt_T = interp_temps[np.argmin(np.abs(dg_interps))]
+
+    fig = go.Figure()
+    fig.add_scatter(x=temperatures, y=dF_bulk, mode='lines', name='Bulk free energy difference')
+    fig.add_scatter(x=temperatures, y=dG_T, mode='lines', name='Loop Free Energy Difference')
+    fig.show(renderer='browser')
+
+    fig = go.Figure(go.Scatter(x=temperatures, y=temp_free_energies,
+                               mode='lines+markers', showlegend=False, marker_color='blue'))
+    fig.add_scatter(x=interp_temps, y=dg_interps,
+                    mode='lines', showlegend=False, marker_color='green')
+    fig.add_scatter(x=[melt_T], y=[0], text=[f"{melt_T:.0f} K"],
+                    marker_color='red', marker_size=20, showlegend=False, mode='markers+text',
+                    textposition='top right')
+    fig.add_scatter(x=temperatures, y=np.zeros_like(temperatures), mode='lines', showlegend=False, marker_color='black')
+    fig.update_layout(xaxis_title='Temperature (K)', yaxis_title="L/S Free Energy Difference")
+    fig.show(renderer='browser')
 
     return None
