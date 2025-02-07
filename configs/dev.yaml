@@ -1,6 +1,6 @@
 structure_name: 'acridine_Form4'
 
-show_plots: False
+show_plots: True
 
 runs_directory: 'D:\crystal_datasets\pscp_runs'  # local
 #runs_directory: '/vast/mk8347/pscp_runs'  # cluster
@@ -31,9 +31,9 @@ stage_three_lambda: False
 stage_two_re_box: False
 
 bulk_free_energy: False
-stage_one_free_energy: False
+stage_one_free_energy: True
 stage_two_free_energy: False
 stage_three_free_energy: False
 
-full_loop_free_energy: True
+full_loop_free_energy: False
 

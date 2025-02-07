@@ -64,7 +64,7 @@ def re_box_energy_calc(structure_name: str,
     # extract box information for each run
     box_params_dict = extract_stage_two_box_params(lambda_runs)
 
-    for lambda_ind, run_dir in zip([lambda_inds, lambda_runs]):
+    for lambda_ind, run_dir in zip(lambda_inds, lambda_runs):
         '''go into the restart directory'''
         os.chdir(run_dir)
 
@@ -73,8 +73,8 @@ def re_box_energy_calc(structure_name: str,
         restart_inds = np.arange(len(restart_files))
         shuffle(restart_inds)
         restart_files = [restart_files[ind] for ind in restart_inds]
-        for restart_ind, restart_file in zip([restart_inds, restart_files]):
-            for lambda_ind2, run_dir2 in enumerate(lambda_runs):
+        for restart_ind, restart_file in zip(restart_inds, restart_files):
+            for lambda_ind2, run_dir2 in zip(lambda_inds, lambda_runs):
                 run_index = f"{lambda_ind}_{restart_ind}_{lambda_ind2}"
                 logfile_name = run_index + ".log"
                 if not os.path.exists(logfile_name):
