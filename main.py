@@ -155,7 +155,8 @@ if __name__ == '__main__':
                     config.structure_name,
                     config.reference_temperature,
                     config.runs_directory,
-                    plot_trajs=config.show_plots)
+                    plot_trajs=config.show_plots,
+                    stage_one_sampling_dir=config.stage_one_sampling_dir)
     if config.stage_two_free_energy:
         from workflows.free_energy_calculation import free_energy
         free_energy('stage_two',

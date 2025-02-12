@@ -32,7 +32,7 @@ stage_two_re_box: False
 
 bulk_free_energy: False
 stage_one_free_energy: True
-stage_two_free_energy: False
+stage_two_free_energy: True
 stage_three_free_energy: False
 
 full_loop_free_energy: False
