@@ -110,7 +110,7 @@ if __name__ == '__main__':
                     config.num_restarts,
                     config.sampling_time,
                     config.restart_sampling_time,
-                    config.stage_one_sampling_dir
+                    stage_one_sampling_dir=config.stage_one_sampling_dir
                     )
     if config.stage_two_lambda:
         from workflows.lambda_sampling import lambda_runs
@@ -121,7 +121,7 @@ if __name__ == '__main__':
                     config.num_restarts,
                     config.sampling_time,
                     config.restart_sampling_time,
-                    config.stage_two_num_restarts
+                    num_stage_two_restarts=config.stage_two_num_restarts
                     )
     if config.stage_three_lambda:
         from workflows.lambda_sampling import lambda_runs

@@ -14,6 +14,7 @@ def lambda_runs(run_type: str,
                 sampling_time: int,  # in fs
                 restart_sampling_time: int,  # in fs
                 num_stage_two_restarts: Optional[int] = None,
+                stage_one_sampling_dir: Optional[str] = None,
                 ):
     pscp_dir = Path(__file__).parent.parent.resolve()
     slurm_file = pscp_dir.joinpath(Path('common').joinpath(Path("sub_job.slurm")))
@@ -29,6 +30,8 @@ def lambda_runs(run_type: str,
 
     sampling_dir = Path('gen_run')
     gen_directory = stage_directory.joinpath(sampling_dir)
+    if run_type == 'stage_one':
+        gen_directory = gen_directory.joinpath(stage_one_sampling_dir)
 
     run_md_name = run_type + '_restart_' + 'run_MD.lmp'
     run_md_path = Path(__file__).parent.resolve().joinpath(run_md_name)
