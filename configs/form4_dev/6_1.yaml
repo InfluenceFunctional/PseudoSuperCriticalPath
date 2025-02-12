@@ -1,0 +1,36 @@
+structure_name: 'acridine_Form4'
+
+#runs_directory: 'D:\crystal_datasets\pscp_runs'  # local
+runs_directory: '/vast/mk8347/pscp_runs'  # cluster
+sampling_time: 2.0e+6  # in fs
+restart_sampling_time: 1.0e+6  # in fs
+equilibration_time: 5.0e+5
+
+reference_temperature: 400
+temperature_span: 100
+temperature_delta: 10
+num_restarts: 100  # number of restart runs to actually do
+num_lambda_runs: 100  # number of restart files saved
+stage_two_num_restarts: 1000
+stage_one_sampling_dir: 'well_width_0.01_well_depth_0.1'
+
+# what to do
+npt_simulation: False
+nvt_simulation: False
+
+stage_one_gen: False
+stage_two_gen: False
+stage_three_gen: False
+
+stage_one_lambda: True
+stage_two_lambda: False
+stage_three_lambda: False
+
+stage_two_re_box: False
+
+stage_one_free_energy: False
+stage_two_free_energy: False
+stage_three_free_energy: False
+
+full_loop_free_energy: False
+

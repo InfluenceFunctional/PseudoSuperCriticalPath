@@ -49,7 +49,7 @@ def plot_run_thermo(lmbd):
 
 
 def analyze_gen_runs(show_figs=False):
-    head_directory = Path(r'D:\crystal_datasets\pscp\stage_one\generate_restart_files_lambda')
+    head_directory = Path(r'D:\crystal_datasets\pscp_runs\acridine_Form4\stage_one\gen_run')
     os.chdir(head_directory)
     dirs = os.listdir()
     dirs = [dir for dir in dirs if 'well_width' in dir]
