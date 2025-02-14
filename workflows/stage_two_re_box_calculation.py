@@ -64,13 +64,13 @@ def re_box_energy_calc(structure_name: str,
     # extract box information for each run
     box_params_dict = extract_stage_two_box_params(lambda_runs)
 
-    outputs_path = 're_box_outputs'
-    if not os.path.exists(outputs_path + '.npy'):
-        np.save(outputs_path, {})
-
     for lambda_ind, run_dir in zip(lambda_inds, lambda_runs):
         '''go into the restart directory'''
         os.chdir(run_dir)
+
+        outputs_path = 're_box_outputs'
+        if not os.path.exists(outputs_path + '.npy'):
+            np.save(outputs_path, {})
 
         restart_files = os.listdir()
         restart_files = [file for file in restart_files if 'stage_two_lambda_sample.restart' in file]
