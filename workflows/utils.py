@@ -9,6 +9,8 @@ def generate_system_settings_file(new_system_settings: Path,
                                   old_system_settings: Path,
                                   init_settings: Path) -> None:
     pair_modify_mix = None
+
+    # extract pair_modify mix mode
     with open(init_settings, "r") as file:
         pair_modify_found = False
         for line in file:
@@ -26,6 +28,7 @@ def generate_system_settings_file(new_system_settings: Path,
     with open(old_system_settings, "r") as file, open(new_system_settings, "w") as write_file:
         epsilons = {}
         sigmas = {}
+        # extract pair coefficients for lj/charmm/coul/long format
         for line in file:
             if line.startswith("pair_coeff"):
                 split_line = line.split()
@@ -42,6 +45,7 @@ def generate_system_settings_file(new_system_settings: Path,
             else:
                 print(line, file=write_file, end="")
 
+        # reconfigure pair coefficients into lj/charmm and coul/long/charm formats, with the appropriate pair mix
         assert len(epsilons) == len(sigmas)
         for t in ("lj/charmm", "coul/long/charmm"):
             for i in epsilons.keys():

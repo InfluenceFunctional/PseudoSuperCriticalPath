@@ -33,7 +33,7 @@ def free_energy(run_type: str,
     if not os.path.exists(stage_directory):
         assert False, "Missing lambda generation trajectory directory!"
 
-    lambda_gen_dir = stage_directory.joinpath(Path('gen_sampling'))
+    lambda_gen_dir = stage_directory.joinpath(Path('gen_run'))
     lambda_restart_dir = stage_directory.joinpath(Path('restart_runs'))
 
     temperature = float(reference_temperature)  # kelvin
@@ -44,6 +44,7 @@ def free_energy(run_type: str,
     number_molecules = np.loadtxt(npt_tmp_path, skiprows=3, max_rows=1, dtype=int)[1]
     if run_type == 'stage_one':
         lambda_energies_path = stage_directory.joinpath(Path(f"{stage_one_sampling_dir}_lambda_energies.npy"))
+        lambda_restart_dir = Path(str(lambda_restart_dir) + '_' + stage_one_sampling_dir)
     else:
         lambda_energies_path = stage_directory.joinpath(Path("lambda_energies.npy"))
 
@@ -70,7 +71,7 @@ def free_energy(run_type: str,
         # convert from lambda steps to lambdas
         lambda_dirs = os.listdir(lambda_restart_dir)
         lambda_dirs = [dir for dir in lambda_dirs if "lambda_" in dir]
-        lambda_steps = [float(dir.split('_')[-1]) for dir in lambda_dirs]
+        lambda_steps = [float(dir.split('_')[-1].replace('-','.')) for dir in lambda_dirs]
         sort_inds = np.argsort(lambda_steps)
 
         lambda_dirs = [lambda_dirs[ind] for ind in sort_inds]

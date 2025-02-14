@@ -64,6 +64,10 @@ def re_box_energy_calc(structure_name: str,
     # extract box information for each run
     box_params_dict = extract_stage_two_box_params(lambda_runs)
 
+    outputs_path = 're_box_outputs'
+    if not os.path.exists(outputs_path + '.npy'):
+        np.save(outputs_path, {})
+
     for lambda_ind, run_dir in zip(lambda_inds, lambda_runs):
         '''go into the restart directory'''
         os.chdir(run_dir)
@@ -76,8 +80,11 @@ def re_box_energy_calc(structure_name: str,
         for restart_ind, restart_file in zip(restart_inds, restart_files):
             for lambda_ind2, run_dir2 in zip(lambda_inds, lambda_runs):
                 run_index = f"{lambda_ind}_{restart_ind}_{lambda_ind2}"
-                logfile_name = run_index + ".log"
-                if not os.path.exists(logfile_name):
+                #logfile_name = run_index + ".log"
+                output_dict = np.load(outputs_path + '.npy').item()
+
+                #if not os.path.exists(logfile_name):
+                if run_index not in list(output_dict.keys()):
                     dx, dy, dz, xy, xz, yz = box_params_dict[str(run_dir2)]
 
                     with (open(run_md_path, "r") as read,
@@ -91,11 +98,18 @@ def re_box_energy_calc(structure_name: str,
                         text = text.replace('_XYV', str(xy))
                         text = text.replace('_XZV', str(xz))
                         text = text.replace('_YZV', str(yz))
-                        text = text.replace("_RUN_INDEX", run_index)
+                        #text = text.replace("_RUN_INDEX", run_index)
+                        text = text.replace("_RUN_INDEX", str(0))
+                        # always output to the same file, we're capturing the output directly anyway
 
                         write.write(text)
 
-                    subprocess.run(['lmp', '-in', 'box_change_run_MD.lmp'], capture_output=False)
+                    output = subprocess.run(['lmp', '-in', 'box_change_run_MD.lmp'], capture_output=True)
+                    log = str(output.stdout)
+                    traj = log.split('Performance:')[0].split('\\n')[-6:]
+                    output_dict = np.load(outputs_path + '.npy').item()
+                    output_dict[run_index] = traj
+                    np.save(outputs_path, output_dict)
 
 
 def extract_stage_two_box_params(lambda_runs):
