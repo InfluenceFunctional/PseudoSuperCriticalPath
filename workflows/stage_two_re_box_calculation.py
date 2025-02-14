@@ -81,7 +81,7 @@ def re_box_energy_calc(structure_name: str,
             for lambda_ind2, run_dir2 in zip(lambda_inds, lambda_runs):
                 run_index = f"{lambda_ind}_{restart_ind}_{lambda_ind2}"
                 #logfile_name = run_index + ".log"
-                output_dict = np.load(outputs_path + '.npy').item()
+                output_dict = np.load(outputs_path + '.npy', allow_pickle=True).item()
 
                 #if not os.path.exists(logfile_name):
                 if run_index not in list(output_dict.keys()):
@@ -107,7 +107,7 @@ def re_box_energy_calc(structure_name: str,
                     output = subprocess.run(['lmp', '-in', 'box_change_run_MD.lmp'], capture_output=True)
                     log = str(output.stdout)
                     traj = log.split('Performance:')[0].split('\\n')[-6:]
-                    output_dict = np.load(outputs_path + '.npy').item()
+                    output_dict = np.load(outputs_path + '.npy', allow_pickle=True).item()
                     output_dict[run_index] = traj
                     np.save(outputs_path, output_dict)
 
