@@ -3,6 +3,7 @@ from pathlib import Path
 import os
 from random import shuffle
 from shutil import copy
+from time import sleep
 
 import numpy as np
 
@@ -63,6 +64,9 @@ def re_box_energy_calc(structure_name: str,
     lambda_runs = [lambda_runs[ind] for ind in lambda_inds]
     # extract box information for each run
     box_params_dict = extract_stage_two_box_params(lambda_runs)
+
+    sleep_times = np.random.uniform(5, 60, 1)
+    sleep(float(sleep_times.flatten()))
 
     for lambda_ind, run_dir in zip(lambda_inds, lambda_runs):
         '''go into the restart directory'''
