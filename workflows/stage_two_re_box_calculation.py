@@ -69,13 +69,16 @@ def re_box_energy_calc(structure_name: str,
         os.chdir(run_dir)
 
         outputs_path = 're_box_outputs'
-        if not os.path.exists(outputs_path + '.npy'):
-            np.save(outputs_path, {})
+        if os.path.exists(outputs_path + '.npy'):
+            print(run_dir, 'already started')
+            pass # skip this lambda
+        else:
+            np.save(outputs_path, {}) # lay a claim
 
         restart_files = os.listdir()
         restart_files = [file for file in restart_files if 'stage_two_lambda_sample.restart' in file]
         restart_inds = np.arange(len(restart_files))
-        shuffle(restart_inds)
+        #shuffle(restart_inds)
         restart_files = [restart_files[ind] for ind in restart_inds]
         for restart_ind, restart_file in zip(restart_inds, restart_files):
             for lambda_ind2, run_dir2 in zip(lambda_inds, lambda_runs):
