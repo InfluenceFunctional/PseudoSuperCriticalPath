@@ -73,6 +73,7 @@ def re_box_energy_calc(structure_name: str,
             print(run_dir, 'already started')
             pass # skip this lambda
         else:
+            print(run_dir, 'started')
             np.save(outputs_path, {}) # lay a claim
 
         restart_files = os.listdir()
