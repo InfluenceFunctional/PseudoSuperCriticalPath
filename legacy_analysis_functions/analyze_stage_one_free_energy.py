@@ -220,7 +220,7 @@ def main():
         overlap = mbar.compute_overlap()
         fig = make_subplots(rows=1, cols=3)
         fig.add_scatter(x=lambdas, y=result['Delta_f'][0, :] / number_molecules,
-                        error_y=dict(type='data', array=[result['dDelta_f'][0, :] / number_molecules], visible=True),
+                        error_y=dict(type='data', array=result['dDelta_f'][0, :] / number_molecules, visible=True),
                         showlegend=False,
                         row=1, col=1
                         )

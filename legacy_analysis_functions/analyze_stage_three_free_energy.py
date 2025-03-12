@@ -207,7 +207,7 @@ def main():
         nn_overlap = np.array([overlap['matrix'][i, i+1] for i in range(len(overlap['matrix'])-1)])
         fig = make_subplots(rows=1, cols=4)
         fig.add_scatter(x=lambdas, y=result['Delta_f'][0, :] / number_molecules,
-                        error_y=dict(type='data', array=[result['dDelta_f'][0, :] / number_molecules], visible=True),
+                        error_y=dict(type='data', array=result['dDelta_f'][0, :] / number_molecules, visible=True),
                         showlegend=False,
                         row=1, col=1
                         )

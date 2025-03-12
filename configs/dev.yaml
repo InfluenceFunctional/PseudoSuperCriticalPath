@@ -14,7 +14,7 @@ temperature_delta: 10
 num_restarts: 100  # number of restart runs to actually do
 num_lambda_runs: 100  # number of restart files saved
 stage_two_num_restarts: 1000
-stage_one_sampling_dir: '0.01_0.1'
+stage_one_sampling_dir: '0.05_0.1'
 
 # what to do
 npt_simulation: False
@@ -30,9 +30,9 @@ stage_three_lambda: False
 
 stage_two_re_box: False
 
-bulk_free_energy: False
+bulk_free_energy: True
 stage_one_free_energy: True
-stage_two_free_energy: False
-stage_three_free_energy: False
+stage_two_free_energy: True
+stage_three_free_energy: True
 
-full_loop_free_energy: False
+full_loop_free_energy: True

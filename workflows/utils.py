@@ -156,8 +156,6 @@ def generate_create_atoms(filename: Path,
     return len(new_types)
 
 
-
-
 def yield_valid_rows(log_file: str) -> Iterable[tuple[int, int]]:
     start_index = None
     final_index = None

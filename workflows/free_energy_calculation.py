@@ -49,6 +49,16 @@ def free_energy(run_type: str,
         lambda_energies_path = stage_directory.joinpath(Path("lambda_energies.npy"))
 
     if run_type == 'stage_two':
+        # ddd = os.getcwd()  # opt DON'T DO THIS
+        # import shutil
+        #
+        # os.chdir(lambda_restart_dir)
+        # restart_dirs = os.listdir(lambda_restart_dir)
+        # bad_dirs = [dd for dd in restart_dirs if ('re_box_outputs.npy' not in os.listdir(dd))]
+        # for dir in bad_dirs:
+        #     shutil.rmtree(dir)
+        # os.chdir(ddd)
+        #
         lambda_dirs = os.listdir(lambda_restart_dir)
         lambda_dirs = [dir for dir in lambda_dirs if "lambda_" in dir]
         lambdas = np.sort([float(dir.split('_')[-1].replace('-', '.')) for dir in lambda_dirs])
@@ -95,17 +105,16 @@ def volumetric_free_energy_calculation(lambda_restart_dir, lambdas, number_molec
                                        stage_directory, mbar_init, plot_trajs, coul_series, gauss_series, lj_series,
                                        old_n_k):
     box_energies_path = stage_directory.joinpath(Path("box_energies.npy"))
-
+    raw_box_energies_path = stage_directory.joinpath(Path("raw_box_energies.npy"))
+    # extract total number of restarts
     run_directory = lambda_restart_dir.joinpath(Path(f"lambda_{1}"))
-    snapshot_files = os.listdir(run_directory)
-    snapshot_files = [file for file in snapshot_files if ('.log' in file and 'screen' not in file)]
+    snapshots_dict = np.load(run_directory.joinpath('re_box_outputs.npy'), allow_pickle=True).item()
     num_restarts = 0
-    for file in snapshot_files:
-        ff = file[:-4].split('_')
+    for key in snapshots_dict.keys():
+        ff = key.split('_')
         i1, i2, i3 = int(ff[0]), int(ff[1]), int(ff[2])
         if i2 > num_restarts:
             num_restarts = i2
-
     num_restarts += 1
 
     if not os.path.exists(box_energies_path):
@@ -115,30 +124,30 @@ def volumetric_free_energy_calculation(lambda_restart_dir, lambdas, number_molec
         for ind, lmbd in enumerate(tqdm(lambdas)):
             lmbd_str = f"{lmbd:.3g}".replace('.', '-')
             run_directory = lambda_restart_dir.joinpath(Path(f"lambda_{lmbd_str}"))
-            assert (np.loadtxt(run_directory.joinpath("tmp.out"), skiprows=3, max_rows=1, dtype=int)[1]
-                    == number_molecules)
 
-            snapshot_files = os.listdir(run_directory)
-            snapshot_files = [file for file in snapshot_files if ('.log' in file and 'screen' not in file)]
+            try:
+                snapshots_dict = np.load(run_directory.joinpath('re_box_outputs.npy'), allow_pickle=True).item()
+            except FileNotFoundError:
+                print(run_directory, "did not have box resampling")
+                pass
 
-            for f_ind, file in enumerate(snapshot_files):
-                ff = file[:-4].split('_')
+            for f_ind, run_id in enumerate(snapshots_dict.keys()):
+                ff = run_id.split('_')
                 i1, i2, i3 = int(ff[0]), int(ff[1]), int(ff[2])
-                log_file = run_directory.joinpath(file)
                 try:
-                    data = pd.read_csv(log_file, skiprows=compose_row_function(log_file, False), sep=r"\s+")
-                    all_box_potentials[i1, i2, i3] = data['PotEng'][0]
-                    all_box_volumes[i1, i2, i3] = data['Volume'][0]
+                    md_info = snapshots_dict[run_id][1].split()
+                    all_box_potentials[i1, i2, i3] = float(md_info[6])
+                    all_box_volumes[i1, i2, i3] = float(md_info[14])
                 except ValueError as e:
-                    if str(e) == "No valid rows found":
-                        pass
+                    print(run_id, "failed")
+                    pass
 
         N = number_molecules
         beta = (1.0 / (unit.BOLTZMANN_CONSTANT_kB
                        * (reference_temperature * unit.kelvin)
                        * unit.AVOGADRO_CONSTANT_NA)).value_in_unit(unit.kilocalorie_per_mole ** (-1))
         reduced_pot = -N * np.log(all_box_volumes) + all_box_potentials * beta
-        np.save(box_energies_path + '_raw', [all_box_potentials, all_box_volumes])
+        np.save(raw_box_energies_path, [all_box_potentials, all_box_volumes])
 
         np.save(box_energies_path, reduced_pot)
     else:
@@ -146,9 +155,22 @@ def volumetric_free_energy_calculation(lambda_restart_dir, lambdas, number_molec
 
     '''free energy calculation'''
     # subsampling
-    reduced_pot = reduced_pot[:, 250:, :]
+    reduced_pot = reduced_pot[:, 50:-55, :]
+
+    # delete rows and columns corresponding to runs which didn't happen at all
+    bad_rows = []
+    for r_ind, row in enumerate(reduced_pot):
+        if np.all(row == np.ones(row.shape) * np.inf):
+            bad_rows.append(r_ind)
+    bad_rows = np.array(bad_rows)
+
+    if len(bad_rows) > 0:
+        reduced_pot = np.delete(reduced_pot, bad_rows, axis=0)
+        reduced_pot = np.delete(reduced_pot, bad_rows, axis=2)
+        lambdas = np.delete(lambdas, bad_rows, axis=0)
 
     # eliminate zero/inf entries
+    bad_rows = []
     bad_bools = ~np.isfinite(reduced_pot)
     for elem in np.argwhere(bad_bools):
         i1, i2, i3 = elem
@@ -156,7 +178,16 @@ def volumetric_free_energy_calculation(lambda_restart_dir, lambdas, number_molec
             [np.mean(reduced_pot[i1, i2-5:i2, i3]),
              np.mean(reduced_pot[i1, i2+1:i2+5, i3])]
         )
-        reduced_pot[i1, i2, i3] = replacement_value
+        if not np.isfinite(replacement_value): # if it's not a simple patch, delete the offending run
+            bad_rows.append(i1)
+        else:
+            reduced_pot[i1, i2, i3] = replacement_value
+
+    if len(bad_rows) > 0:
+        bad_rows = list(set(bad_rows))
+        reduced_pot = np.delete(reduced_pot, bad_rows, axis=0)
+        reduced_pot = np.delete(reduced_pot, bad_rows, axis=2)
+        lambdas = np.delete(lambdas, bad_rows, axis=0)
 
     ukn = np.zeros((len(lambdas), reduced_pot.shape[-1] * reduced_pot.shape[-2]))
     for ind in range(len(lambdas)):
@@ -180,14 +211,14 @@ def volumetric_free_energy_calculation(lambda_restart_dir, lambdas, number_molec
         plot_energy_traj(batch, lambdas, ukn)
         fig = go.Figure(go.Heatmap(z=ukn)).show(renderer='browser')
 
-    mbar = pymbar.MBAR(ukn, n_k, initialize='BAR')  #, n_bootstraps=50)
-    result = mbar.compute_free_energy_differences()  #uncertainty_method='bootstrap')
+    mbar = pymbar.MBAR(ukn, n_k, initialize='BAR', n_bootstraps=200)
+    result = mbar.compute_free_energy_differences(uncertainty_method='bootstrap')
     if plot_trajs:
         overlap = mbar.compute_overlap()
         nn_overlap = np.array([overlap['matrix'][i, i + 1] for i in range(len(overlap['matrix']) - 1)])
         fig = make_subplots(rows=1, cols=4)
         fig.add_scatter(x=lambdas, y=result['Delta_f'][0, :] / number_molecules,
-                        error_y=dict(type='data', array=[result['dDelta_f'][0, :] / number_molecules], visible=True),
+                        error_y=dict(type='data', array=result['dDelta_f'][0, :] / number_molecules, visible=True),
                         showlegend=False,
                         row=1, col=1
                         )
@@ -241,15 +272,15 @@ def alchemical_free_energy_calculation(coul_series, gauss_series, lambdas, lj_se
     sample_inds = np.concatenate(sample_inds)
     new_ukn = ukn[:, sample_inds]
     new_nk = np.array(new_nk)
-    mbar = pymbar.MBAR(new_ukn, new_nk, initialize=mbar_init)  #, n_bootstraps=200)
-    result = mbar.compute_free_energy_differences()  #uncertainty_method='bootstrap')
+    mbar = pymbar.MBAR(new_ukn, new_nk, initialize=mbar_init, n_bootstraps=200)
+    result = mbar.compute_free_energy_differences(uncertainty_method='bootstrap')
     if plot_trajs:
         # opt plot overlap matrix
         overlap = mbar.compute_overlap()
         nn_overlap = np.array([overlap['matrix'][i, i + 1] for i in range(len(overlap['matrix']) - 1)])
         fig = make_subplots(rows=1, cols=4)
         fig.add_scatter(x=lambdas, y=result['Delta_f'][0, :] / number_molecules,
-                        error_y=dict(type='data', array=[result['dDelta_f'][0, :] / number_molecules], visible=True),
+                        error_y=dict(type='data', array=result['dDelta_f'][0, :] / number_molecules, visible=True),
                         showlegend=False,
                         row=1, col=1
                         )
@@ -361,8 +392,8 @@ def extract_run_inter_energies(lambda_restart_dir, lambdas, lambda_dirs, number_
     scale_series = np.zeros((len(lambdas), 4))
     for ind, (lmbd, dir) in enumerate(tqdm(zip(lambdas, lambda_dirs))):
         run_directory = lambda_restart_dir.joinpath(dir)
-        assert (np.loadtxt(run_directory.joinpath("tmp.out"), skiprows=3, max_rows=1, dtype=int)[1]
-                == number_molecules)
+        # assert (np.loadtxt(run_directory.joinpath("tmp.out"), skiprows=3, max_rows=1, dtype=int)[1]
+        #         == number_molecules)
         log_file = run_directory.joinpath("screen.log")
         # noinspection PyTypeChecker
         try:
@@ -432,8 +463,8 @@ def relative_free_energy(
     for directory_index, (directory, state) in enumerate(zip((fluid_directory, solid_directory), ('fluid', 'solid'))):
         energies_path = structure_directory.joinpath(f"{state}_bulk_energies.npy")
 
-        if os.path.isfile(energies_path):
-            pass
+        if False: #os.path.isfile(energies_path):
+            pass # todo reload data
 
         else:
             print("Reading timeseries.")
@@ -481,9 +512,9 @@ def relative_free_energy(
                            * unit.AVOGADRO_CONSTANT_NA)).value_in_unit(unit.kilocalorie_per_mole ** (-1))
             ukn[i, :] = beta * data_series[:]
 
-        mbar = pymbar.MBAR(ukn, n_k, initialize="BAR")
+        mbar = pymbar.MBAR(ukn, n_k, initialize="BAR", n_bootstraps=200)
         overlap = mbar.compute_overlap()
-        result = mbar.compute_free_energy_differences()
+        result = mbar.compute_free_energy_differences(uncertainty_method='bootstrap')
         results_list.append(result)
         overlaps_list.append(overlap)
 
@@ -494,7 +525,7 @@ def relative_free_energy(
 
             if state == 'fluid':
                 fig.add_scatter(x=temperatures, y=result['Delta_f'][0, :] / number_molecules,
-                                error_y=dict(type='data', array=[result['dDelta_f'][0, :] / number_molecules],
+                                error_y=dict(type='data', array=result['dDelta_f'][0, :] / number_molecules,
                                              visible=True),
                                 showlegend=True,
                                 name=state, legendgroup=state, marker_color='blue',
@@ -509,7 +540,7 @@ def relative_free_energy(
                                 name=state, legendgroup=state, row=1, col=4)
             else:
                 fig.add_scatter(x=temperatures, y=result['Delta_f'][0, :] / number_molecules,
-                                error_y=dict(type='data', array=[result['dDelta_f'][0, :] / number_molecules],
+                                error_y=dict(type='data', array=result['dDelta_f'][0, :] / number_molecules,
                                              visible=True),
                                 showlegend=True,
                                 name=state, legendgroup=state, marker_color='red',
@@ -566,9 +597,8 @@ def loop_free_energy(
         results = np.load(results_path, allow_pickle=True).item()
         dG = results['Delta_f']
         ddG = results['dDelta_f']
-        if stage != 'stage_two':
-            dG /= number_molecules
-            ddG /= number_molecules
+        dG /= number_molecules
+        ddG /= number_molecules
         dgs.append(dG[0, :])
         ddgs.append(ddG[0, :])
 
@@ -579,6 +609,7 @@ def loop_free_energy(
     for ind in range(3):
         fig.add_scatter(x=np.arange(len(dgs[ind])) + xlevel,
                         y=dgs[ind] - dgs[ind][0] + ylevel,
+                        error_y=dict(type='data', array=ddG, visible=True),
                         name=stage_names[ind], )
         ylevel += dgs[ind][-1]
         xlevel += len(dgs[ind]) - 1
@@ -586,7 +617,18 @@ def loop_free_energy(
     fig.update_layout(title='Alchemical Profile', yaxis_title='Free Energy', xaxis_title="Lambda Steps")
     fig.show(renderer='browser')
 
-    dG_T_ref = -ylevel
+    dF_bulk, dG_T, dg_interps, interp_temps, melt_T, temp_free_energies = extract_melt_T(dgs, reference_temperature,
+                                                                                         temperatures, ylevel)
+
+    dg_vs_t_bulk_loop_fig(dF_bulk, dG_T, temperatures)
+    melt_T_intercept_fig(dg_interps, interp_temps, melt_T, temp_free_energies, temperatures)
+
+    aa = 1
+    """ sensitivity analysis
+melt_Ts = []
+test_dgs = np.linspace(-3, 3, 50)
+for level in test_dgs:
+    dG_T_ref = -level
     dF_bulk = dgs[-1] - dgs[-2]
     tref_ind = np.argwhere(temperatures == reference_temperature).flatten()
     dF_ref = dF_bulk[tref_ind]
@@ -605,12 +647,59 @@ def loop_free_energy(
     interp_temps = np.linspace(temperatures[0], temperatures[-1], 10000)
     dg_interps = np.interp(interp_temps, temperatures, temp_free_energies)
     melt_T = interp_temps[np.argmin(np.abs(dg_interps))]
+    melt_Ts.append(melt_T)
 
-    fig = go.Figure()
-    fig.add_scatter(x=temperatures, y=dF_bulk, mode='lines', name='Bulk free energy difference')
-    fig.add_scatter(x=temperatures, y=dG_T, mode='lines', name='Loop Free Energy Difference')
-    fig.show(renderer='browser')
+dG_T_ref = -ylevel
+dF_bulk = dgs[-1] - dgs[-2]
+tref_ind = np.argwhere(temperatures == reference_temperature).flatten()
+dF_ref = dF_bulk[tref_ind]
+# from equation 4, dG(l,s) = kbT[dF(T)-dF(T_ref)] + (T/T_ref)*dG(T_ref)
+temp_free_energies = np.zeros(len(temperatures))
+bulk_ddF = np.zeros(len(temperatures))
+dG_T = np.zeros(len(temperatures))
+for ind, temp in enumerate(temperatures):
+    beta = (1.0 / (unit.BOLTZMANN_CONSTANT_kB
+                   * (temp * unit.kelvin)
+                   * unit.AVOGADRO_CONSTANT_NA)).value_in_unit(unit.kilocalorie_per_mole ** (-1))
+    bulk_ddF[ind] = (dF_bulk[ind] - dF_ref) / beta
+    dG_T[ind] = (temp / reference_temperature) * dG_T_ref
+    temp_free_energies[ind] = (dF_bulk[ind] - dF_ref) / beta + (temp / reference_temperature) * dG_T_ref
 
+interp_temps = np.linspace(temperatures[0], temperatures[-1], 10000)
+dg_interps = np.interp(interp_temps, temperatures, temp_free_energies)
+melt_T = interp_temps[np.argmin(np.abs(dg_interps))]
+
+fig = go.Figure()
+fig.add_scatter(x=test_dgs, y=np.array(melt_Ts), name="Trend")
+fig.add_scatter(x=[ylevel], y=[melt_T], name="Prediction")
+fig.update_layout(xaxis_title='Loop Free Energy (kJ/mol) (L - S)', yaxis_title="Predicted Melt T")
+    """
+    return None
+
+
+def extract_melt_T(dgs, reference_temperature, temperatures, ylevel):
+    dG_T_ref = -ylevel
+    dF_bulk = dgs[-1] - dgs[-2]
+    tref_ind = np.argwhere(temperatures == reference_temperature).flatten()
+    dF_ref = dF_bulk[tref_ind]
+    # from equation 4, dG(l,s) = kbT[dF(T)-dF(T_ref)] + (T/T_ref)*dG(T_ref)
+    temp_free_energies = np.zeros(len(temperatures))
+    bulk_ddF = np.zeros(len(temperatures))
+    dG_T = np.zeros(len(temperatures))
+    for ind, temp in enumerate(temperatures):
+        beta = (1.0 / (unit.BOLTZMANN_CONSTANT_kB
+                       * (temp * unit.kelvin)
+                       * unit.AVOGADRO_CONSTANT_NA)).value_in_unit(unit.kilocalorie_per_mole ** (-1))
+        bulk_ddF[ind] = (dF_bulk[ind] - dF_ref) / beta
+        dG_T[ind] = (temp / reference_temperature) * dG_T_ref
+        temp_free_energies[ind] = (dF_bulk[ind] - dF_ref) / beta + (temp / reference_temperature) * dG_T_ref
+    interp_temps = np.linspace(temperatures[0], temperatures[-1], 10000)
+    dg_interps = np.interp(interp_temps, temperatures, temp_free_energies)
+    melt_T = interp_temps[np.argmin(np.abs(dg_interps))]
+    return dF_bulk, dG_T, dg_interps, interp_temps, melt_T, temp_free_energies
+
+
+def melt_T_intercept_fig(dg_interps, interp_temps, melt_T, temp_free_energies, temperatures):
     fig = go.Figure(go.Scatter(x=temperatures, y=temp_free_energies,
                                mode='lines+markers', showlegend=False, marker_color='blue'))
     fig.add_scatter(x=interp_temps, y=dg_interps,
@@ -622,4 +711,9 @@ def loop_free_energy(
     fig.update_layout(xaxis_title='Temperature (K)', yaxis_title="L/S Free Energy Difference")
     fig.show(renderer='browser')
 
-    return None
+
+def dg_vs_t_bulk_loop_fig(dF_bulk, dG_T, temperatures):
+    fig = go.Figure()
+    fig.add_scatter(x=temperatures, y=dF_bulk, mode='lines', name='Bulk free energy difference')
+    fig.add_scatter(x=temperatures, y=dG_T, mode='lines', name='Loop Free Energy Difference')
+    fig.show(renderer='browser')
